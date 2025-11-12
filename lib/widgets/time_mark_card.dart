@@ -16,71 +16,84 @@ class TimeMarkCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  Color _getPosicionColor(int pos) {
-    if (pos == 1) return const Color(0xFFFFD700); // Oro
-    if (pos == 2) return const Color(0xFFC0C0C0); // Plata
-    if (pos == 3) return const Color(0xFFCD7F32); // Bronce
-    return AppTheme.primaryColor;
+  List<Color> _getPosicionGradient(int pos) {
+    if (pos == 1) {
+      // Rojo - 1er lugar
+      return [const Color(0xFFE53935), const Color(0xFFD32F2F)];
+    }
+    if (pos == 2) {
+      // Rosado - 2do lugar
+      return [const Color(0xFFEC407A), const Color(0xFFD81B60)];
+    }
+    if (pos == 3) {
+      // Morado - 3er lugar
+      return [const Color(0xFF7E57C2), const Color(0xFF5E35B1)];
+    }
+    // Naranja - resto
+    return [const Color(0xFFFF6F00), const Color(0xFFE65100)];
   }
 
   IconData _getPosicionIcon(int pos) {
-    if (pos <= 3) return FontAwesomeIcons.medal;
-    return FontAwesomeIcons.flag;
+    if (pos == 1) return FontAwesomeIcons.trophy;
+    if (pos == 2) return FontAwesomeIcons.medal;
+    if (pos == 3) return FontAwesomeIcons.award;
+    return FontAwesomeIcons.flagCheckered;
   }
 
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('HH:mm:ss');
+    final gradient = _getPosicionGradient(posicion);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [_getPosicionColor(posicion).withOpacity(0.08), Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
         ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: _getPosicionColor(posicion).withOpacity(0.3),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: _getPosicionColor(posicion).withOpacity(0.1),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: gradient[0].withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           onTap: () {},
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                // Posición con medalla
+                // Badge de posición
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                       colors: [
-                        _getPosicionColor(posicion),
-                        _getPosicionColor(posicion).withOpacity(0.7),
+                        Colors.white.withOpacity(0.3),
+                        Colors.white.withOpacity(0.1),
                       ],
                     ),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.5),
+                      width: 2,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: _getPosicionColor(posicion).withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -90,48 +103,56 @@ class TimeMarkCard extends StatelessWidget {
                       Icon(
                         _getPosicionIcon(posicion),
                         color: Colors.white,
-                        size: 14,
+                        size: 18,
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         '$posicion',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 11,
+                          fontSize: 12,
                           color: Colors.white,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                // Tiempo
+                const SizedBox(width: 14),
+                // Información del tiempo
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         registro.tiempoFormateado,
-                        style: TextStyle(
-                          fontSize: 22,
+                        style: const TextStyle(
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          color: _getPosicionColor(posicion),
+                          fontFeatures: [FontFeature.tabularFigures()],
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black26,
+                              offset: Offset(0, 2),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(
-                            Icons.access_time,
-                            size: 11,
-                            color: Colors.grey.shade500,
+                            Icons.schedule_rounded,
+                            size: 12,
+                            color: Colors.white.withOpacity(0.9),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 5),
                           Text(
                             dateFormat.format(registro.timestamp),
                             style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.9),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -142,19 +163,25 @@ class TimeMarkCard extends StatelessWidget {
                 ),
                 // Botón eliminar
                 Container(
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: AppTheme.errorColor.withOpacity(0.1),
+                    color: Colors.white.withOpacity(0.2),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1.5,
+                    ),
                   ),
                   child: IconButton(
                     icon: const Icon(
-                      Icons.close,
-                      color: AppTheme.errorColor,
+                      Icons.delete_outline_rounded,
+                      color: Colors.white,
                       size: 20,
                     ),
                     constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
+                      minWidth: 40,
+                      minHeight: 40,
                     ),
                     padding: EdgeInsets.zero,
                     onPressed: () {

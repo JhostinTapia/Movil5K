@@ -3,42 +3,48 @@
     {
       "id": 1,
       "nombre": "5K UNL 2025 - Estudiantes",
-      "fecha": "2025-11-15T09:00:00Z",
+      "fecha_hora": "2025-11-11T11:37:00Z",
       "categoria": "estudiantes",
-      "estado": "activa"
+      "activa": true,
+      "en_curso": false,
+      "fecha_inicio": null,
+      "fecha_fin": null
     },
     {
       "id": 2,
       "nombre": "5K UNL 2025 - Interfacultades",
-      "fecha": "2025-11-15T11:00:00Z",
+      "fecha_hora": "2025-11-15T11:00:00Z",
       "categoria": "interfacultades",
-      "estado": "activa"
+      "activa": true,
+      "en_curso": false,
+      "fecha_inicio": null,
+      "fecha_fin": null
     }
   ],
   "jueces": [
     {
       "id": 1,
       "nombre": "Dr. Juan Pérez",
-      "competenciaId": 1,
-      "categoria": "estudiantes"
+      "competencia": 1,
+      "activo": true
     },
     {
       "id": 2,
       "nombre": "Dra. María García",
-      "competenciaId": 1,
-      "categoria": "estudiantes"
+      "competencia": 1,
+      "activo": true
     },
     {
       "id": 3,
       "nombre": "Ing. Carlos López",
-      "competenciaId": 2,
-      "categoria": "interfacultades"
+      "competencia": 2,
+      "activo": true
     },
     {
       "id": 4,
       "nombre": "Lic. Ana Rodríguez",
-      "competenciaId": 2,
-      "categoria": "interfacultades"
+      "competencia": 2,
+      "activo": true
     }
   ],
   "equipos": [
@@ -46,73 +52,49 @@
       "id": 1,
       "nombre": "Equipo Medicina",
       "dorsal": 101,
-      "categoria": "estudiantes",
-      "juezAsignado": 1,
-      "participantes": 15,
-      "facultad": "Facultad de Medicina"
+      "juez_asignado": 1
     },
     {
       "id": 2,
       "nombre": "Equipo Ingeniería",
       "dorsal": 102,
-      "categoria": "estudiantes",
-      "juezAsignado": 1,
-      "participantes": 15,
-      "facultad": "Facultad de Ingeniería"
+      "juez_asignado": 1
     },
     {
       "id": 3,
       "nombre": "Equipo Derecho",
       "dorsal": 103,
-      "categoria": "estudiantes",
-      "juezAsignado": 2,
-      "participantes": 15,
-      "facultad": "Facultad de Derecho"
+      "juez_asignado": 2
     },
     {
       "id": 4,
       "nombre": "Equipo Economía",
       "dorsal": 104,
-      "categoria": "estudiantes",
-      "juezAsignado": 2,
-      "participantes": 15,
-      "facultad": "Facultad de Economía"
+      "juez_asignado": 2
     },
     {
       "id": 5,
       "nombre": "Interfacultades Ciencias",
       "dorsal": 201,
-      "categoria": "interfacultades",
-      "juezAsignado": 3,
-      "participantes": 15,
-      "facultad": "Ciencias Exactas y Naturales"
+      "juez_asignado": 3
     },
     {
       "id": 6,
       "nombre": "Interfacultades Salud",
       "dorsal": 202,
-      "categoria": "interfacultades",
-      "juezAsignado": 3,
-      "participantes": 15,
-      "facultad": "Ciencias de la Salud"
+      "juez_asignado": 3
     },
     {
       "id": 7,
       "nombre": "Interfacultades Sociales",
       "dorsal": 203,
-      "categoria": "interfacultades",
-      "juezAsignado": 4,
-      "participantes": 15,
-      "facultad": "Ciencias Sociales y Humanas"
+      "juez_asignado": 4
     },
     {
       "id": 8,
       "nombre": "Interfacultades Técnicas",
       "dorsal": 204,
-      "categoria": "interfacultades",
-      "juezAsignado": 4,
-      "participantes": 15,
-      "facultad": "Ciencias Técnicas"
+      "juez_asignado": 4
     }
   ]
 }

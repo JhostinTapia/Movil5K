@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../providers/auth_provider.dart';
 import '../config/theme.dart';
 import '../models/equipo.dart';
+import '../models/competencia.dart';
 
 class EquiposAsignadosScreen extends StatefulWidget {
   const EquiposAsignadosScreen({super.key});
@@ -17,6 +18,7 @@ class EquiposAsignadosScreen extends StatefulWidget {
 class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
     with SingleTickerProviderStateMixin {
   List<Equipo> equiposAsignados = [];
+  Competencia? competencia;
   bool isLoading = true;
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
@@ -28,9 +30,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
     _cargarEquipos();
   }
 
@@ -46,20 +49,34 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       final juezId = authProvider.juez?.id ?? 1;
 
       // Cargar datos del JSON
-      final String response =
-          await rootBundle.loadString('assets/data/mock_data.json');
+      final String response = await rootBundle.loadString(
+        'assets/data/mock_data.json',
+      );
       final data = json.decode(response);
+
+      // Cargar competencia del juez
+      final List<dynamic> juecesJson = data['jueces'];
+      final juezData = juecesJson.firstWhere((j) => j['id'] == juezId);
+      final competenciaId = juezData['competencia'];
+
+      final List<dynamic> competenciasJson = data['competencias'];
+      final competenciaData = competenciasJson.firstWhere(
+        (c) => c['id'] == competenciaId,
+      );
+      competencia = Competencia.fromJson(competenciaData);
 
       // Filtrar equipos asignados al juez actual
       final List<dynamic> equiposJson = data['equipos'];
       final equiposFiltrados = equiposJson
-          .where((e) => e['juezAsignado'] == juezId)
-          .map((e) => Equipo(
-                id: e['id'],
-                nombre: e['nombre'],
-                dorsal: e['dorsal'],
-                juezAsignado: e['juezAsignado'],
-              ))
+          .where((e) => e['juez_asignado'] == juezId)
+          .map(
+            (e) => Equipo(
+              id: e['id'],
+              nombre: e['nombre'],
+              dorsal: e['dorsal'],
+              juezAsignado: e['juez_asignado'],
+            ),
+          )
           .toList();
 
       setState(() {
@@ -84,7 +101,11 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   }
 
   void _seleccionarEquipo(Equipo equipo) {
-    Navigator.pushNamed(context, '/timer', arguments: equipo);
+    Navigator.pushNamed(
+      context,
+      '/timer',
+      arguments: {'equipo': equipo, 'competencia': competencia},
+    );
   }
 
   @override
@@ -97,11 +118,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF667eea),
-              Color(0xFF764ba2),
-              Color(0xFFf093fb),
-            ],
+            colors: [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)],
           ),
         ),
         child: Stack(
@@ -131,21 +148,14 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
             SafeArea(
               child: Column(
                 children: [
-                  // Header
+                  // Header con información del juez
                   Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                     child: Column(
                       children: [
+                        // Botón de logout
                         Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.arrow_back,
-                                color: Colors.white,
-                                size: 26,
-                              ),
-                              onPressed: () => Navigator.pop(context),
-                            ),
                             const Spacer(),
                             IconButton(
                               icon: const Icon(
@@ -163,53 +173,71 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        // Información del juez
+                        const SizedBox(height: 16),
+
+                        // Card de información del juez
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.deepPurple.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: Colors.white.withOpacity(0.3),
                               width: 1.5,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                           ),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(15),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
                                 child: const Icon(
                                   Icons.person,
                                   color: Color(0xFF667eea),
-                                  size: 28,
+                                  size: 32,
                                 ),
                               ),
-                              const SizedBox(width: 15),
+                              const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Juez Asignado',
                                       style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white.withOpacity(0.9),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.5,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     Text(
                                       authProvider.juez?.nombre ?? 'Sin nombre',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 18,
+                                        fontSize: 20,
                                         fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.3,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
@@ -230,10 +258,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF667eea),
-                                Color(0xFF764ba2),
-                              ],
+                              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -261,10 +286,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                             ),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF667eea),
-                                  Color(0xFF764ba2),
-                                ],
+                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -294,63 +316,65 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                             ),
                           )
                         : equiposAsignados.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(20),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            const Color(0xFF667eea)
-                                                .withOpacity(0.1),
-                                            const Color(0xFF764ba2)
-                                                .withOpacity(0.1),
-                                          ],
-                                        ),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        FontAwesomeIcons.userGroup,
-                                        size: 50,
-                                        color: Colors.grey.shade400,
-                                      ),
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(
+                                          0xFF667eea,
+                                        ).withOpacity(0.1),
+                                        const Color(
+                                          0xFF764ba2,
+                                        ).withOpacity(0.1),
+                                      ],
                                     ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No hay equipos asignados',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Contacta al administrador\npara asignarte equipos',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : FadeTransition(
-                                opacity: _fadeAnimation,
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
+                                    shape: BoxShape.circle,
                                   ),
-                                  itemCount: equiposAsignados.length,
-                                  itemBuilder: (context, index) {
-                                    final equipo = equiposAsignados[index];
-                                    return _buildEquipoCard(equipo, index);
-                                  },
+                                  child: Icon(
+                                    FontAwesomeIcons.userGroup,
+                                    size: 50,
+                                    color: Colors.grey.shade400,
+                                  ),
                                 ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No hay equipos asignados',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Contacta al administrador\npara asignarte equipos',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
                               ),
+                              itemCount: equiposAsignados.length,
+                              itemBuilder: (context, index) {
+                                final equipo = equiposAsignados[index];
+                                return _buildEquipoCard(equipo, index);
+                              },
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -393,10 +417,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: gradient[0].withOpacity(0.3),
-                width: 2,
-              ),
+              border: Border.all(color: gradient[0].withOpacity(0.3), width: 2),
             ),
             child: Row(
               children: [

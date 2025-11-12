@@ -55,6 +55,13 @@ dependencies:
   
   # Icons
   font_awesome_flutter: ^10.7.0
+  
+  # Database local
+  sqflite: ^2.3.0
+  path_provider: ^2.1.1
+  
+  # Conectividad
+  connectivity_plus: ^6.1.0
 
 dev_dependencies:
   flutter_test:

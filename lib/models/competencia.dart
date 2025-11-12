@@ -13,8 +13,8 @@ class Competencia {
     required this.nombre,
     required this.fechaHora,
     required this.categoria,
-    required this.activa,
-    required this.enCurso,
+    this.activa = true,
+    this.enCurso = false,
     this.fechaInicio,
     this.fechaFin,
   });
@@ -25,8 +25,8 @@ class Competencia {
       nombre: json['nombre'],
       fechaHora: DateTime.parse(json['fecha_hora']),
       categoria: json['categoria'],
-      activa: json['activa'],
-      enCurso: json['en_curso'],
+      activa: json['activa'] ?? true,
+      enCurso: json['en_curso'] ?? false,
       fechaInicio: json['fecha_inicio'] != null
           ? DateTime.parse(json['fecha_inicio'])
           : null,
@@ -54,4 +54,34 @@ class Competencia {
         ? 'Estudiantes por Equipos'
         : 'Interfacultades por Equipos';
   }
+
+  // Verifica si la competencia ya comenzó
+  bool get haComenzado {
+    return DateTime.now().isAfter(fechaHora);
+  }
+
+  // Verifica si la competencia está en progreso
+  bool get estaEnProgreso {
+    return enCurso && haComenzado;
+  }
+
+  // Verifica si la competencia está por comenzar
+  bool get estaPorComenzar {
+    return !haComenzado && activa;
+  }
+
+  // Tiempo faltante para que comience
+  Duration get tiempoRestante {
+    if (haComenzado) return Duration.zero;
+    return fechaHora.difference(DateTime.now());
+  }
+
+  // Estado de la competencia
+  String get estadoActual {
+    if (fechaFin != null) return 'FINALIZADA';
+    if (estaEnProgreso) return 'EN CURSO';
+    if (estaPorComenzar) return 'POR INICIAR';
+    return 'INACTIVA';
+  }
 }
+
