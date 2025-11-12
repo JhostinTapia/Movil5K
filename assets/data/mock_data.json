@@ -1,0 +1,118 @@
+{
+  "competencias": [
+    {
+      "id": 1,
+      "nombre": "5K UNL 2025 - Estudiantes",
+      "fecha": "2025-11-15T09:00:00Z",
+      "categoria": "estudiantes",
+      "estado": "activa"
+    },
+    {
+      "id": 2,
+      "nombre": "5K UNL 2025 - Interfacultades",
+      "fecha": "2025-11-15T11:00:00Z",
+      "categoria": "interfacultades",
+      "estado": "activa"
+    }
+  ],
+  "jueces": [
+    {
+      "id": 1,
+      "nombre": "Dr. Juan Pérez",
+      "competenciaId": 1,
+      "categoria": "estudiantes"
+    },
+    {
+      "id": 2,
+      "nombre": "Dra. María García",
+      "competenciaId": 1,
+      "categoria": "estudiantes"
+    },
+    {
+      "id": 3,
+      "nombre": "Ing. Carlos López",
+      "competenciaId": 2,
+      "categoria": "interfacultades"
+    },
+    {
+      "id": 4,
+      "nombre": "Lic. Ana Rodríguez",
+      "competenciaId": 2,
+      "categoria": "interfacultades"
+    }
+  ],
+  "equipos": [
+    {
+      "id": 1,
+      "nombre": "Equipo Medicina",
+      "dorsal": 101,
+      "categoria": "estudiantes",
+      "juezAsignado": 1,
+      "participantes": 15,
+      "facultad": "Facultad de Medicina"
+    },
+    {
+      "id": 2,
+      "nombre": "Equipo Ingeniería",
+      "dorsal": 102,
+      "categoria": "estudiantes",
+      "juezAsignado": 1,
+      "participantes": 15,
+      "facultad": "Facultad de Ingeniería"
+    },
+    {
+      "id": 3,
+      "nombre": "Equipo Derecho",
+      "dorsal": 103,
+      "categoria": "estudiantes",
+      "juezAsignado": 2,
+      "participantes": 15,
+      "facultad": "Facultad de Derecho"
+    },
+    {
+      "id": 4,
+      "nombre": "Equipo Economía",
+      "dorsal": 104,
+      "categoria": "estudiantes",
+      "juezAsignado": 2,
+      "participantes": 15,
+      "facultad": "Facultad de Economía"
+    },
+    {
+      "id": 5,
+      "nombre": "Interfacultades Ciencias",
+      "dorsal": 201,
+      "categoria": "interfacultades",
+      "juezAsignado": 3,
+      "participantes": 15,
+      "facultad": "Ciencias Exactas y Naturales"
+    },
+    {
+      "id": 6,
+      "nombre": "Interfacultades Salud",
+      "dorsal": 202,
+      "categoria": "interfacultades",
+      "juezAsignado": 3,
+      "participantes": 15,
+      "facultad": "Ciencias de la Salud"
+    },
+    {
+      "id": 7,
+      "nombre": "Interfacultades Sociales",
+      "dorsal": 203,
+      "categoria": "interfacultades",
+      "juezAsignado": 4,
+      "participantes": 15,
+      "facultad": "Ciencias Sociales y Humanas"
+    },
+    {
+      "id": 8,
+      "nombre": "Interfacultades Técnicas",
+      "dorsal": 204,
+      "categoria": "interfacultades",
+      "juezAsignado": 4,
+      "participantes": 15,
+      "facultad": "Ciencias Técnicas"
+    }
+  ]
+}
