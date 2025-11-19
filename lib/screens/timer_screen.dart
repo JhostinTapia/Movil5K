@@ -22,12 +22,16 @@ class _TimerScreenState extends State<TimerScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
-        final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+        final timerProvider = Provider.of<TimerProvider>(
+          context,
+          listen: false,
+        );
         final equipo = args['equipo'] as Equipo;
         final competencia = args['competencia'] as Competencia?;
-        
+
         timerProvider.setEquipo(equipo);
         if (competencia != null) {
           timerProvider.setCompetencia(competencia);
@@ -38,7 +42,10 @@ class _TimerScreenState extends State<TimerScreen> {
 
   List<Color> _getEstadoColors(TimerProvider provider) {
     if (provider.isCompleted) {
-      return [AppTheme.secondaryColor, AppTheme.secondaryColor.withOpacity(0.8)];
+      return [
+        AppTheme.secondaryColor,
+        AppTheme.secondaryColor.withOpacity(0.8),
+      ];
     }
     if (provider.isRunning) {
       return [const Color(0xFF667eea), const Color(0xFF764ba2)];
@@ -60,8 +67,12 @@ class _TimerScreenState extends State<TimerScreen> {
 
   String _getTiempoRestante(TimerProvider provider) {
     if (provider.competenciaActual == null) return '';
-    
-    final tiempoRestante = provider.competenciaActual!.tiempoRestante;
+
+    final tiempoRestante = provider.tiempoHastaInicio;
+    if (tiempoRestante == null || tiempoRestante.inSeconds <= 0) {
+      return 'Iniciando automáticamente...';
+    }
+
     final horas = tiempoRestante.inHours;
     final minutos = tiempoRestante.inMinutes.remainder(60);
     final segundos = tiempoRestante.inSeconds.remainder(60);
@@ -70,10 +81,8 @@ class _TimerScreenState extends State<TimerScreen> {
       return 'Inicia en: ${horas}h ${minutos}m';
     } else if (minutos > 0) {
       return 'Inicia en: ${minutos}m ${segundos}s';
-    } else if (segundos > 0) {
-      return 'Inicia en: ${segundos}s';
     } else {
-      return 'Iniciando...';
+      return 'Inicia en: ${segundos}s ⚡';
     }
   }
 
@@ -88,20 +97,48 @@ class _TimerScreenState extends State<TimerScreen> {
       return;
     }
 
+    // Asegurar que el WebSocket esté conectado antes de enviar
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+
+    debugPrint('🔌 Verificando conexión WebSocket antes de enviar...');
+    if (!timerProvider.isWebSocketConnected) {
+      debugPrint('⚠️ WebSocket desconectado, intentando reconectar...');
+      try {
+        await authProvider.connectWebSocket();
+        debugPrint('✅ WebSocket reconectado exitosamente');
+      } catch (e) {
+        debugPrint('❌ Error reconectando WebSocket: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Error conectando al servidor. Intente nuevamente.',
+              ),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    } else {
+      debugPrint('✅ WebSocket ya está conectado');
+    }
+
     if (context.mounted) {
       showDialog(
         context: context,
         builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667eea),
-                  Color(0xFF764ba2),
-                ],
+                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -202,10 +239,7 @@ class _TimerScreenState extends State<TimerScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF667eea),
-                Color(0xFF764ba2),
-              ],
+              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
             ),
             borderRadius: BorderRadius.circular(20),
           ),
@@ -261,10 +295,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   ),
                   child: const Text(
                     'Entendido',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
               ),
@@ -278,86 +309,170 @@ class _TimerScreenState extends State<TimerScreen> {
   void _mostrarModalExito(BuildContext context, int cantidadRegistros) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          elevation: 8,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF43A047), Color(0xFF66BB6A)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF43A047).withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Ícono de éxito con animación
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.2),
+                        blurRadius: 15,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 64,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Título
+                const Text(
+                  '¡Envío Exitoso!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Cantidad de registros
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$cantidadRegistros registros sincronizados',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Descripción
+                Text(
+                  'Todos los datos fueron sincronizados correctamente con el servidor.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.white.withOpacity(0.95),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Botón de Aceptar
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF43A047),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Aceptar',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _enviarDatos(BuildContext context) async {
+    final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+
+    // Guardar referencia al Navigator ANTES de cualquier operación async
+    final navigator = Navigator.of(context);
+
+    // Mostrar indicador de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingContext) => Dialog(
+        backgroundColor: Colors.transparent,
         child: Container(
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF43A047),
-                Color(0xFF66BB6A),
-              ],
+              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
             ),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
+          child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Colors.white,
-                  size: 40,
-                ),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                strokeWidth: 3,
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'Envío Exitoso',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 12),
+              SizedBox(height: 20),
               Text(
-                'Se enviaron $cantidadRegistros registros',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
+                'Enviando datos...',
+                style: TextStyle(
+                  color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Todos los datos fueron sincronizados correctamente con el servidor.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.9),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF43A047),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Aceptar',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -365,166 +480,26 @@ class _TimerScreenState extends State<TimerScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _enviarDatos(BuildContext context) async {
-    final timerProvider = Provider.of<TimerProvider>(context, listen: false);
-
-    // Mostrar indicador de carga
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF667eea),
-                  Color(0xFF764ba2),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  strokeWidth: 3,
-                ),
-                SizedBox(height: 20),
-                Text(
-                  'Enviando datos...',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     try {
-      final registros = await timerProvider.getRegistrosNoSincronizados();
+      // Enviar registros por WebSocket (carga desde BD internamente)
+      final resultado = await timerProvider.enviarRegistrosPorWebSocket();
 
-      // Cerrar indicador de carga
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
+      // Cerrar indicador de carga usando navigator guardado
+      navigator.pop();
 
-      if (registros.isEmpty) {
-        if (context.mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF667eea),
-                      Color(0xFF764ba2),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.info_outline,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Sin Datos',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No hay datos pendientes para sincronizar.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF667eea),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Aceptar',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-        return;
-      }
+      // Pequeña espera para que el pop se complete
+      await Future.delayed(const Duration(milliseconds: 100));
 
-      // Aquí iría la lógica de envío al servidor
-      // Simulamos un delay de envío
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Mostrar modal de éxito
-      if (context.mounted) {
-        _mostrarModalExito(context, registros.length);
-      }
-    } catch (e) {
-      // Cerrar indicador de carga si aún está abierto
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
-      if (context.mounted) {
+      // Mostrar modal según el resultado
+      if (resultado['success'] == true) {
+        // Usar el mismo navigator para mostrar el siguiente dialog
+        _mostrarModalExito(navigator.context, resultado['total'] ?? 0);
+      } else {
+        // Mostrar error usando navigator.context
         showDialog(
-          context: context,
-          builder: (context) => Dialog(
+          context: navigator.context,
+          builder: (dialogContext) => Dialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -533,10 +508,7 @@ class _TimerScreenState extends State<TimerScreen> {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFE53935),
-                    Color(0xFFEF5350),
-                  ],
+                  colors: [Color(0xFFE53935), Color(0xFFEF5350)],
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -551,14 +523,14 @@ class _TimerScreenState extends State<TimerScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.error_outline,
+                      Icons.cloud_off,
                       color: Colors.white,
                       size: 40,
                     ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    'Error',
+                    'Error al Enviar',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -567,7 +539,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Ocurrió un error al enviar los datos: $e',
+                    resultado['message'] ?? 'Error desconocido',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -579,7 +551,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFFE53935),
@@ -604,7 +576,384 @@ class _TimerScreenState extends State<TimerScreen> {
           ),
         );
       }
+    } catch (e) {
+      debugPrint('Error enviando datos: $e');
+      // Intentar cerrar indicador de carga si aún está abierto
+      navigator.pop();
+
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      showDialog(
+        context: navigator.context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFE53935), Color(0xFFEF5350)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Error',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Ocurrió un error al enviar los datos: $e',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.9),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFFE53935),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Aceptar',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
+  }
+
+  void _mostrarDialogPenalizacion(BuildContext context) {
+    final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+    int jugadoresFaltantes = 1; // Valor inicial
+    int minutosPenalizacion = 2; // Minutos de penalización por defecto
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFF57C00), Color(0xFFE64A19)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Título
+                const Text(
+                  'Aplicar Penalización',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Descripción
+                Text(
+                  'Configura la cantidad de jugadores faltantes y el tiempo de penalización.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.95),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Selector de jugadores faltantes
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Jugadores Faltantes',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Botón -
+                          IconButton(
+                            onPressed: jugadoresFaltantes > 1
+                                ? () => setState(() => jugadoresFaltantes--)
+                                : null,
+                            icon: const Icon(Icons.remove_circle),
+                            color: Colors.white,
+                            disabledColor: Colors.white.withOpacity(0.3),
+                            iconSize: 36,
+                          ),
+                          const SizedBox(width: 20),
+
+                          // Número
+                          Container(
+                            width: 70,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$jugadoresFaltantes',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFF57C00),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+
+                          // Botón +
+                          IconButton(
+                            onPressed: jugadoresFaltantes < 14
+                                ? () => setState(() => jugadoresFaltantes++)
+                                : null,
+                            icon: const Icon(Icons.add_circle),
+                            color: Colors.white,
+                            disabledColor: Colors.white.withOpacity(0.3),
+                            iconSize: 36,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Selector de minutos de penalización
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Minutos de Penalización',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Botón -
+                          IconButton(
+                            onPressed: minutosPenalizacion > 1
+                                ? () => setState(() => minutosPenalizacion--)
+                                : null,
+                            icon: const Icon(Icons.remove_circle),
+                            color: Colors.white,
+                            disabledColor: Colors.white.withOpacity(0.3),
+                            iconSize: 36,
+                          ),
+                          const SizedBox(width: 20),
+
+                          // Número
+                          Container(
+                            width: 70,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$minutosPenalizacion',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFF57C00),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+
+                          // Botón +
+                          IconButton(
+                            onPressed: minutosPenalizacion < 30
+                                ? () => setState(() => minutosPenalizacion++)
+                                : null,
+                            icon: const Icon(Icons.add_circle),
+                            color: Colors.white,
+                            disabledColor: Colors.white.withOpacity(0.3),
+                            iconSize: 36,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Resumen de penalización
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade300,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Se crearán $jugadoresFaltantes registros de $minutosPenalizacion min c/u',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Botones
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text(
+                          'Cancelar',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.of(dialogContext).pop();
+                          await timerProvider.aplicarPenalizacion(
+                            jugadoresFaltantes,
+                            minutosPenalizacion,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '$jugadoresFaltantes registros de $minutosPenalizacion min agregados',
+                                ),
+                                backgroundColor: Colors.orange.shade700,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color(0xFFF57C00),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Aplicar',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _mostrarMenuOpciones(BuildContext context) {
@@ -628,7 +977,10 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
             const SizedBox(height: 20),
             ListTile(
-              leading: const Icon(Icons.storage_rounded, color: AppTheme.primaryColor),
+              leading: const Icon(
+                Icons.storage_rounded,
+                color: AppTheme.primaryColor,
+              ),
               title: const Text('Ver Base de Datos Local'),
               subtitle: const Text('Registros almacenados en SQLite'),
               onTap: () {
@@ -658,12 +1010,15 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.people, color: AppTheme.primaryColor),
-              title: const Text('Cambiar Equipo'),
-              subtitle: const Text('Asignar otro equipo'),
+              leading: const Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFF57C00),
+              ),
+              title: const Text('Aplicar Penalización'),
+              subtitle: const Text('Por jugadores faltantes'),
               onTap: () {
                 Navigator.pop(context);
-                // Aquí iría la lógica para cambiar de equipo
+                _mostrarDialogPenalizacion(context);
               },
             ),
             const Divider(),
@@ -693,11 +1048,7 @@ class _TimerScreenState extends State<TimerScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF667eea),
-              Color(0xFF764ba2),
-              Color(0xFFf093fb),
-            ],
+            colors: [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)],
           ),
         ),
         child: Stack(
@@ -759,8 +1110,9 @@ class _TimerScreenState extends State<TimerScreen> {
                                         borderRadius: BorderRadius.circular(10),
                                         boxShadow: [
                                           BoxShadow(
-                                            color:
-                                                Colors.black.withOpacity(0.1),
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
                                           ),
@@ -798,20 +1150,19 @@ class _TimerScreenState extends State<TimerScreen> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: timerProvider.participantesRegistrados >=
+                            color:
+                                timerProvider.participantesRegistrados >=
                                     TimerProvider.maxParticipantes
                                 ? Colors.white
                                 : Colors.white.withOpacity(0.25),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 2,
-                            ),
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: Text(
                             '${timerProvider.participantesRegistrados}/${TimerProvider.maxParticipantes}',
                             style: TextStyle(
-                              color: timerProvider.participantesRegistrados >=
+                              color:
+                                  timerProvider.participantesRegistrados >=
                                       TimerProvider.maxParticipantes
                                   ? const Color(0xFF667eea)
                                   : Colors.white,
@@ -862,8 +1213,9 @@ class _TimerScreenState extends State<TimerScreen> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: _getEstadoColors(timerProvider)[0]
-                                    .withOpacity(0.3),
+                                color: _getEstadoColors(
+                                  timerProvider,
+                                )[0].withOpacity(0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
@@ -900,29 +1252,32 @@ class _TimerScreenState extends State<TimerScreen> {
                             fontFeatures: const [FontFeature.tabularFigures()],
                             height: 1.1,
                             foreground: Paint()
-                              ..shader = LinearGradient(
-                                colors: timerProvider.isCompleted
-                                    ? [
-                                        AppTheme.secondaryColor,
-                                        AppTheme.secondaryColor
-                                            .withOpacity(0.8)
-                                      ]
-                                    : timerProvider.isRunning
+                              ..shader =
+                                  LinearGradient(
+                                    colors: timerProvider.isCompleted
+                                        ? [
+                                            AppTheme.secondaryColor,
+                                            AppTheme.secondaryColor.withOpacity(
+                                              0.8,
+                                            ),
+                                          ]
+                                        : timerProvider.isRunning
                                         ? [
                                             const Color(0xFF667eea),
-                                            const Color(0xFF764ba2)
+                                            const Color(0xFF764ba2),
                                           ]
                                         : [
                                             Colors.grey.shade600,
-                                            Colors.grey.shade500
+                                            Colors.grey.shade500,
                                           ],
-                              ).createShader(
-                                const Rect.fromLTWH(0, 0, 200, 70),
-                              ),
+                                  ).createShader(
+                                    const Rect.fromLTWH(0, 0, 200, 70),
+                                  ),
                           ),
                         ),
                         // Mostrar tiempo faltante si está por comenzar
-                        if (timerProvider.competenciaActual?.estaPorComenzar ?? false) ...[
+                        if (timerProvider.competenciaActual?.estaPorComenzar ??
+                            false) ...[
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -966,23 +1321,22 @@ class _TimerScreenState extends State<TimerScreen> {
                             width: double.infinity,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF667eea),
-                                  Color(0xFF764ba2),
-                                ],
+                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                               ),
                               borderRadius: BorderRadius.circular(15),
                               boxShadow: [
                                 BoxShadow(
-                                  color:
-                                      const Color(0xFF667eea).withOpacity(0.4),
+                                  color: const Color(
+                                    0xFF667eea,
+                                  ).withOpacity(0.4),
                                   blurRadius: 12,
                                   offset: const Offset(0, 5),
                                 ),
                               ],
                             ),
                             child: ElevatedButton.icon(
-                              onPressed: () => _mostrarConfirmacionEnvio(context),
+                              onPressed: () =>
+                                  _mostrarConfirmacionEnvio(context),
                               icon: const Icon(Icons.cloud_upload, size: 20),
                               label: const Text(
                                 'Enviar Data Recolectada',
@@ -996,8 +1350,9 @@ class _TimerScreenState extends State<TimerScreen> {
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
                                 foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(15),
                                 ),
@@ -1020,20 +1375,21 @@ class _TimerScreenState extends State<TimerScreen> {
                             colors: timerProvider.isRunning
                                 ? [
                                     const Color(0xFFFFA726),
-                                    const Color(0xFFFF9800)
+                                    const Color(0xFFFF9800),
                                   ]
                                 : [
                                     const Color(0xFF43A047),
-                                    const Color(0xFF66BB6A)
+                                    const Color(0xFF66BB6A),
                                   ],
                           ),
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
                             BoxShadow(
-                              color: (timerProvider.isRunning
-                                      ? const Color(0xFFFFA726)
-                                      : const Color(0xFF43A047))
-                                  .withOpacity(0.4),
+                              color:
+                                  (timerProvider.isRunning
+                                          ? const Color(0xFFFFA726)
+                                          : const Color(0xFF43A047))
+                                      .withOpacity(0.4),
                               blurRadius: 12,
                               offset: const Offset(0, 5),
                             ),
@@ -1054,9 +1410,7 @@ class _TimerScreenState extends State<TimerScreen> {
                             size: 22,
                           ),
                           label: Text(
-                            timerProvider.isRunning
-                                ? 'Pausar (Dev)'
-                                : 'Iniciar (Dev)',
+                            timerProvider.isRunning ? 'Pausar' : 'Iniciar',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -1086,10 +1440,7 @@ class _TimerScreenState extends State<TimerScreen> {
                         width: double.infinity,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF667eea),
-                              Color(0xFF764ba2),
-                            ],
+                            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -1218,10 +1569,12 @@ class _TimerScreenState extends State<TimerScreen> {
                                           decoration: BoxDecoration(
                                             gradient: LinearGradient(
                                               colors: [
-                                                const Color(0xFF667eea)
-                                                    .withOpacity(0.1),
-                                                const Color(0xFF764ba2)
-                                                    .withOpacity(0.1),
+                                                const Color(
+                                                  0xFF667eea,
+                                                ).withOpacity(0.1),
+                                                const Color(
+                                                  0xFF764ba2,
+                                                ).withOpacity(0.1),
                                               ],
                                             ),
                                             shape: BoxShape.circle,
@@ -1267,9 +1620,10 @@ class _TimerScreenState extends State<TimerScreen> {
                                       return TimeMarkCard(
                                         registro: registro,
                                         posicion: index + 1,
-                                        onDelete: () => timerProvider
-                                            .eliminarRegistro(
-                                                registro.idRegistro),
+                                        onDelete: () =>
+                                            timerProvider.eliminarRegistro(
+                                              registro.idRegistro,
+                                            ),
                                       );
                                     },
                                   ),

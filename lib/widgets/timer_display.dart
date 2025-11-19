@@ -90,30 +90,127 @@ class TimerDisplay extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Display del cronómetro
-          Text(
-            timerProvider.tiempoFormateado,
-            style: TextStyle(
-              fontSize: 64,
-              fontWeight: FontWeight.bold,
-              fontFeatures: const [FontFeature.tabularFigures()],
-              color: timerProvider.isCompleted
-                  ? AppTheme.secondaryColor
-                  : timerProvider.isRunning
-                  ? AppTheme.primaryColor
-                  : AppTheme.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'MM:SS.CS',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-              fontWeight: FontWeight.w500,
-            ),
+          // Display del cronómetro con etiquetas
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Horas
+              _buildTimeUnit(
+                value: timerProvider.horas.toString().padLeft(2, '0'),
+                label: 'HORAS',
+                isRunning: timerProvider.isRunning,
+                isCompleted: timerProvider.isCompleted,
+              ),
+              _buildSeparator(
+                timerProvider.isRunning,
+                timerProvider.isCompleted,
+              ),
+
+              // Minutos
+              _buildTimeUnit(
+                value: timerProvider.minutos.toString().padLeft(2, '0'),
+                label: 'MIN',
+                isRunning: timerProvider.isRunning,
+                isCompleted: timerProvider.isCompleted,
+              ),
+              _buildSeparator(
+                timerProvider.isRunning,
+                timerProvider.isCompleted,
+              ),
+
+              // Segundos
+              _buildTimeUnit(
+                value: timerProvider.segundos.toString().padLeft(2, '0'),
+                label: 'SEG',
+                isRunning: timerProvider.isRunning,
+                isCompleted: timerProvider.isCompleted,
+              ),
+              _buildSeparator(
+                timerProvider.isRunning,
+                timerProvider.isCompleted,
+                isDot: true,
+              ),
+
+              // Milisegundos (centésimas)
+              _buildTimeUnit(
+                value: (timerProvider.milisegundos ~/ 10).toString().padLeft(
+                  2,
+                  '0',
+                ),
+                label: 'CS',
+                isRunning: timerProvider.isRunning,
+                isCompleted: timerProvider.isCompleted,
+                isSmall: true,
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTimeUnit({
+    required String value,
+    required String label,
+    required bool isRunning,
+    required bool isCompleted,
+    bool isSmall = false,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isSmall ? 48 : 64,
+            fontWeight: FontWeight.bold,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: isCompleted
+                ? AppTheme.secondaryColor
+                : isRunning
+                ? AppTheme.primaryColor
+                : AppTheme.textSecondary,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeparator(
+    bool isRunning,
+    bool isCompleted, {
+    bool isDot = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: isDot ? 4 : 8,
+        right: isDot ? 4 : 8,
+        bottom: 20,
+      ),
+      child: Text(
+        isDot ? '.' : ':',
+        style: TextStyle(
+          fontSize: 48,
+          fontWeight: FontWeight.bold,
+          color: isCompleted
+              ? AppTheme.secondaryColor
+              : isRunning
+              ? AppTheme.primaryColor
+              : AppTheme.textSecondary,
+          height: 1,
+        ),
       ),
     );
   }

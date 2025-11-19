@@ -15,7 +15,9 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
+  final _passwordController = TextEditingController();
   String _categoriaSeleccionada = 'estudiantes';
+  bool _obscurePassword = true;
 
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -43,15 +45,13 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+          ),
+        );
 
     _controller.forward();
   }
@@ -60,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _controller.dispose();
     _nombreController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -70,8 +71,19 @@ class _LoginScreenState extends State<LoginScreen>
       try {
         await authProvider.login(
           _nombreController.text.trim(),
-          1, // ID de competencia por defecto
+          _passwordController.text,
         );
+
+        // Conectar WebSocket después del login exitoso
+        if (mounted && authProvider.juez != null) {
+          try {
+            await authProvider.connectWebSocket();
+            debugPrint('✅ WebSocket conectado después del login');
+          } catch (e) {
+            debugPrint('⚠️ Error conectando WebSocket: $e');
+            // No es crítico, continuar de todas formas
+          }
+        }
 
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/equipos');
@@ -121,9 +133,10 @@ class _LoginScreenState extends State<LoginScreen>
       child: TextFormField(
         controller: _nombreController,
         style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
+        keyboardType: TextInputType.emailAddress,
         decoration: InputDecoration(
-          prefixIcon: Icon(Icons.person_outline, color: Colors.grey.shade400),
-          hintText: 'Nombre del Juez',
+          prefixIcon: Icon(Icons.email_outlined, color: Colors.grey.shade400),
+          hintText: 'Email',
           hintStyle: TextStyle(color: Colors.grey.shade400),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -133,7 +146,57 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         validator: (value) {
           if (value == null || value.trim().isEmpty) {
-            return 'Por favor ingresa tu nombre';
+            return 'Por favor ingresa tu email';
+          }
+          if (!value.contains('@')) {
+            return 'Email inválido';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: TextFormField(
+        controller: _passwordController,
+        obscureText: _obscurePassword,
+        style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.lock_outline, color: Colors.grey.shade400),
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              color: Colors.grey.shade400,
+            ),
+            onPressed: () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            },
+          ),
+          hintText: 'Contraseña',
+          hintStyle: TextStyle(color: Colors.grey.shade400),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 18,
+          ),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Por favor ingresa tu contraseña';
+          }
+          if (value.length < 6) {
+            return 'La contraseña debe tener al menos 6 caracteres';
           }
           return null;
         },
@@ -272,11 +335,7 @@ class _LoginScreenState extends State<LoginScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF667eea),
-              Color(0xFF764ba2),
-              Color(0xFFf093fb),
-            ],
+            colors: [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)],
           ),
         ),
         child: AnimatedBuilder(
@@ -384,8 +443,9 @@ class _LoginScreenState extends State<LoginScreen>
                                         decoration: BoxDecoration(
                                           color: AppTheme.primaryColor
                                               .withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: const Icon(
                                           Icons.person,
@@ -406,8 +466,12 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                   const SizedBox(height: 25),
 
-                                  // Campo nombre
+                                  // Campo email
                                   _buildNombreField(),
+                                  const SizedBox(height: 20),
+
+                                  // Campo contraseña
+                                  _buildPasswordField(),
                                   const SizedBox(height: 20),
 
                                   // Campo categoría

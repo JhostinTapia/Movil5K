@@ -17,6 +17,11 @@ class TimeMarkCard extends StatelessWidget {
   });
 
   List<Color> _getPosicionGradient(int pos) {
+    // Si es un registro penalizado, usar color distintivo (gris oscuro/negro)
+    if (registro.penalizado) {
+      return [const Color(0xFF424242), const Color(0xFF212121)];
+    }
+
     if (pos == 1) {
       // Rojo - 1er lugar
       return [const Color(0xFFE53935), const Color(0xFFD32F2F)];
@@ -34,6 +39,9 @@ class TimeMarkCard extends StatelessWidget {
   }
 
   IconData _getPosicionIcon(int pos) {
+    // Si es penalizado, mostrar icono de advertencia
+    if (registro.penalizado) return FontAwesomeIcons.triangleExclamation;
+
     if (pos == 1) return FontAwesomeIcons.trophy;
     if (pos == 2) return FontAwesomeIcons.medal;
     if (pos == 3) return FontAwesomeIcons.award;
@@ -123,6 +131,29 @@ class TimeMarkCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Si es penalizado, mostrar etiqueta
+                      if (registro.penalizado) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade400,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'PENALIZACIÓN',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       Text(
                         registro.tiempoFormateado,
                         style: const TextStyle(
@@ -143,13 +174,17 @@ class TimeMarkCard extends StatelessWidget {
                       Row(
                         children: [
                           Icon(
-                            Icons.schedule_rounded,
+                            registro.penalizado
+                                ? Icons.gavel_rounded
+                                : Icons.schedule_rounded,
                             size: 12,
                             color: Colors.white.withOpacity(0.9),
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            dateFormat.format(registro.timestamp),
+                            registro.penalizado
+                                ? 'Tiempo Agregado'
+                                : dateFormat.format(registro.timestamp),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.9),

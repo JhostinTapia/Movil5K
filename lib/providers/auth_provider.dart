@@ -1,66 +1,176 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/juez.dart';
+import '../models/competencia.dart';
+import '../repositories/app_repository.dart';
 
+/// Provider que maneja el estado de autenticación del juez
 class AuthProvider extends ChangeNotifier {
-  Juez? _juez;
-  bool _isLoading = false;
+  final AppRepository _repository;
 
+  Juez? _juez;
+  List<Competencia> _competencias = [];
+  bool _isLoading = false;
+  String? _error;
+
+  AuthProvider({AppRepository? repository})
+    : _repository = repository ?? AppRepository();
+
+  // Getters
   Juez? get juez => _juez;
+  List<Competencia> get competencias => _competencias;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _juez != null;
+  String? get error => _error;
+  AppRepository get repository => _repository;
 
-  Future<void> login(String nombre, int competenciaId) async {
+  /// Inicia sesión con username y password
+  Future<bool> login(String username, String password) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final result = await _repository.login(username, password);
+
+      _juez = result['juez'] as Juez;
+      _competencias = result['competencias'] as List<Competencia>;
+
+      _isLoading = false;
+      notifyListeners();
+
+      return true;
+    } catch (e) {
+      _error = _getErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Intenta restaurar la sesión guardada
+  Future<void> loadSavedSession() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      // Simulación de login - aquí irá la llamada al API
-      await Future.delayed(const Duration(seconds: 1));
+      final hasSession = await _repository.hasSession();
 
-      _juez = Juez(
-        id: 1,
-        nombre: nombre,
-        competenciaId: competenciaId,
-        activo: true,
-      );
+      if (hasSession) {
+        _juez = await _repository.restoreSession();
 
-      // Guardar en SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('juez_nombre', nombre);
-      await prefs.setInt('juez_id', 1);
-      await prefs.setInt('competencia_id', competenciaId);
+        if (_juez != null) {
+          // Cargar competencias
+          _competencias = await _repository.getCompetencias();
+
+          // Conectar WebSocket automáticamente al restaurar sesión
+          debugPrint('🔌 Restaurando sesión - Conectando WebSocket...');
+          try {
+            await connectWebSocket();
+            debugPrint('✅ WebSocket conectado al restaurar sesión');
+          } catch (e) {
+            debugPrint('⚠️ Error conectando WebSocket al restaurar: $e');
+            // No fallar la restauración de sesión si el WebSocket falla
+          }
+        }
+      }
 
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      debugPrint('Error cargando sesión: $e');
+      _juez = null;
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Cierra sesión
+  Future<void> logout() async {
+    try {
+      await _repository.logout();
+      _juez = null;
+      _competencias = [];
+      _error = null;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error en logout: $e');
+    }
+  }
+
+  /// Refresca el access token
+  Future<void> refreshToken() async {
+    try {
+      await _repository.refreshAccessToken();
+    } catch (e) {
+      debugPrint('Error refrescando token: $e');
+      // Si falla el refresh, cerrar sesión
+      await logout();
+    }
+  }
+
+  /// Actualiza la lista de competencias
+  Future<void> refreshCompetencias() async {
+    try {
+      _competencias = await _repository.getCompetencias();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refrescando competencias: $e');
+    }
+  }
+
+  /// Conecta el WebSocket para recibir notificaciones en tiempo real
+  Future<void> connectWebSocket() async {
+    if (_juez == null) {
+      debugPrint('⚠️ No se puede conectar WebSocket: no hay juez autenticado');
+      return;
+    }
+
+    try {
+      await _repository.connectWebSocket(_juez!.id);
+      debugPrint('✅ WebSocket conectado para juez ${_juez!.id}');
+    } catch (e) {
+      debugPrint('❌ Error conectando WebSocket: $e');
       rethrow;
     }
   }
 
-  Future<void> loadSavedSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nombre = prefs.getString('juez_nombre');
-    final id = prefs.getInt('juez_id');
-    final competenciaId = prefs.getInt('competencia_id');
-
-    if (nombre != null && id != null && competenciaId != null) {
-      _juez = Juez(
-        id: id,
-        nombre: nombre,
-        competenciaId: competenciaId,
-        activo: true,
-      );
-      notifyListeners();
-    }
+  /// Limpia el error
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    _juez = null;
-    notifyListeners();
+  /// Obtiene un mensaje de error amigable
+  String _getErrorMessage(dynamic error) {
+    final errorStr = error.toString();
+
+    if (errorStr.contains('SocketException') ||
+        errorStr.contains('NetworkException')) {
+      return 'No hay conexión a internet';
+    }
+
+    if (errorStr.contains('401') || errorStr.contains('Unauthorized')) {
+      return 'Usuario o contraseña incorrectos';
+    }
+
+    if (errorStr.contains('403') || errorStr.contains('Forbidden')) {
+      return 'Usuario inactivo. Contacte al administrador';
+    }
+
+    if (errorStr.contains('500')) {
+      return 'Error en el servidor. Intente más tarde';
+    }
+
+    if (errorStr.contains('TimeoutException')) {
+      return 'La solicitud tardó demasiado. Intente nuevamente';
+    }
+
+    return 'Error al iniciar sesión: $errorStr';
+  }
+
+  @override
+  void dispose() {
+    _repository.dispose();
+    super.dispose();
   }
 }

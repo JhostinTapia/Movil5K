@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'dart:convert';
-import 'package:flutter/services.dart';
 import '../providers/auth_provider.dart';
+import '../providers/timer_provider.dart';
 import '../config/theme.dart';
 import '../models/equipo.dart';
 import '../models/competencia.dart';
+import '../widgets/countdown_banner.dart';
 
 class EquiposAsignadosScreen extends StatefulWidget {
   const EquiposAsignadosScreen({super.key});
@@ -46,38 +46,18 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   Future<void> _cargarEquipos() async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final juezId = authProvider.juez?.id ?? 1;
+      final timerProvider = Provider.of<TimerProvider>(context, listen: false);
 
-      // Cargar datos del JSON
-      final String response = await rootBundle.loadString(
-        'assets/data/mock_data.json',
-      );
-      final data = json.decode(response);
+      // Cargar competencias desde la API
+      final competencias = await authProvider.repository.getCompetencias();
+      if (competencias.isNotEmpty) {
+        competencia = competencias.first;
+        // Configurar la competencia en el TimerProvider para monitoreo
+        await timerProvider.setCompetencia(competencia!);
+      }
 
-      // Cargar competencia del juez
-      final List<dynamic> juecesJson = data['jueces'];
-      final juezData = juecesJson.firstWhere((j) => j['id'] == juezId);
-      final competenciaId = juezData['competencia'];
-
-      final List<dynamic> competenciasJson = data['competencias'];
-      final competenciaData = competenciasJson.firstWhere(
-        (c) => c['id'] == competenciaId,
-      );
-      competencia = Competencia.fromJson(competenciaData);
-
-      // Filtrar equipos asignados al juez actual
-      final List<dynamic> equiposJson = data['equipos'];
-      final equiposFiltrados = equiposJson
-          .where((e) => e['juez_asignado'] == juezId)
-          .map(
-            (e) => Equipo(
-              id: e['id'],
-              nombre: e['nombre'],
-              dorsal: e['dorsal'],
-              juezAsignado: e['juez_asignado'],
-            ),
-          )
-          .toList();
+      // Cargar equipos asignados desde la API
+      final equiposFiltrados = await authProvider.repository.getEquipos();
 
       setState(() {
         equiposAsignados = equiposFiltrados;
@@ -304,6 +284,11 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                   ),
 
                   const SizedBox(height: 20),
+
+                  // Banner de cuenta regresiva
+                  const CountdownBanner(),
+
+                  const SizedBox(height: 10),
 
                   // Lista de equipos
                   Expanded(

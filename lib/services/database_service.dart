@@ -21,8 +21,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 4, // Incrementada para agregar columna penalizado
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -33,12 +34,14 @@ class DatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         id_registro TEXT UNIQUE NOT NULL,
         equipo_id INTEGER NOT NULL,
-        equipo_nombre TEXT NOT NULL,
-        equipo_dorsal INTEGER NOT NULL,
-        juez_id INTEGER NOT NULL,
         tiempo INTEGER NOT NULL,
         timestamp TEXT NOT NULL,
-        sincronizado INTEGER DEFAULT 0
+        horas INTEGER DEFAULT 0,
+        minutos INTEGER DEFAULT 0,
+        segundos INTEGER DEFAULT 0,
+        milisegundos INTEGER DEFAULT 0,
+        sincronizado INTEGER DEFAULT 0,
+        penalizado INTEGER DEFAULT 0
       )
     ''');
 
@@ -52,27 +55,47 @@ class DatabaseService {
     ''');
   }
 
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 4) {
+      // Recrear tabla completamente con columna penalizado
+
+      // 1. Eliminar tabla vieja
+      await db.execute('DROP TABLE IF EXISTS registros_tiempo');
+
+      // 2. Crear tabla nueva con esquema correcto
+      await db.execute('''
+        CREATE TABLE registros_tiempo (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id_registro TEXT UNIQUE NOT NULL,
+          equipo_id INTEGER NOT NULL,
+          tiempo INTEGER NOT NULL,
+          timestamp TEXT NOT NULL,
+          horas INTEGER DEFAULT 0,
+          minutos INTEGER DEFAULT 0,
+          segundos INTEGER DEFAULT 0,
+          milisegundos INTEGER DEFAULT 0,
+          sincronizado INTEGER DEFAULT 0,
+          penalizado INTEGER DEFAULT 0
+        )
+      ''');
+
+      // 3. Recrear índices
+      await db.execute('''
+        CREATE INDEX idx_equipo_id ON registros_tiempo(equipo_id)
+      ''');
+
+      await db.execute('''
+        CREATE INDEX idx_sincronizado ON registros_tiempo(sincronizado)
+      ''');
+    }
+  }
+
   // Guardar registro de tiempo
-  Future<int> insertRegistroTiempo(
-    RegistroTiempo registro,
-    int equipoId,
-    String equipoNombre,
-    int equipoDorsal,
-    int juezId,
-  ) async {
+  Future<int> insertRegistroTiempo(RegistroTiempo registro) async {
     final db = await database;
     return await db.insert(
       'registros_tiempo',
-      {
-        'id_registro': registro.idRegistro,
-        'equipo_id': equipoId,
-        'equipo_nombre': equipoNombre,
-        'equipo_dorsal': equipoDorsal,
-        'juez_id': juezId,
-        'tiempo': registro.tiempo,
-        'timestamp': registro.timestamp.toIso8601String(),
-        'sincronizado': 0,
-      },
+      registro.toDbMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -89,14 +112,15 @@ class DatabaseService {
   }
 
   // Obtener registros no sincronizados
-  Future<List<Map<String, dynamic>>> getRegistrosNoSincronizados() async {
+  Future<List<RegistroTiempo>> getRegistrosNoSincronizados(int equipoId) async {
     final db = await database;
-    return await db.query(
+    final maps = await db.query(
       'registros_tiempo',
-      where: 'sincronizado = ?',
-      whereArgs: [0],
+      where: 'sincronizado = ? AND equipo_id = ?',
+      whereArgs: [0, equipoId],
       orderBy: 'timestamp ASC',
     );
+    return maps.map((map) => RegistroTiempo.fromDbMap(map)).toList();
   }
 
   // Marcar registros como sincronizados
@@ -133,10 +157,7 @@ class DatabaseService {
   // Obtener todos los registros
   Future<List<Map<String, dynamic>>> obtenerTodosLosRegistros() async {
     final db = await database;
-    return await db.query(
-      'registros_tiempo',
-      orderBy: 'timestamp DESC',
-    );
+    return await db.query('registros_tiempo', orderBy: 'timestamp DESC');
   }
 
   // Obtener registros pendientes de sincronizar
@@ -152,10 +173,16 @@ class DatabaseService {
   // Obtener conteo de registros por estado
   Future<Map<String, int>> obtenerEstadisticas() async {
     final db = await database;
-    final total = await db.rawQuery('SELECT COUNT(*) as count FROM registros_tiempo');
-    final pendientes = await db.rawQuery('SELECT COUNT(*) as count FROM registros_tiempo WHERE sincronizado = 0');
-    final sincronizados = await db.rawQuery('SELECT COUNT(*) as count FROM registros_tiempo WHERE sincronizado = 1');
-    
+    final total = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM registros_tiempo',
+    );
+    final pendientes = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM registros_tiempo WHERE sincronizado = 0',
+    );
+    final sincronizados = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM registros_tiempo WHERE sincronizado = 1',
+    );
+
     return {
       'total': Sqflite.firstIntValue(total) ?? 0,
       'pendientes': Sqflite.firstIntValue(pendientes) ?? 0,

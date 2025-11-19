@@ -27,8 +27,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // Providers que crean su propio AppRepository (NO compartido aún)
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => TimerProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, TimerProvider>(
+          create: (_) => TimerProvider(),
+          update: (context, authProvider, timerProvider) {
+            // Compartir el repository del AuthProvider con el TimerProvider
+            timerProvider!.setRepository(authProvider.repository);
+            return timerProvider;
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'Carrera 5K UNL',

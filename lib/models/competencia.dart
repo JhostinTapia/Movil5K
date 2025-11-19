@@ -83,5 +83,27 @@ class Competencia {
     if (estaPorComenzar) return 'POR INICIAR';
     return 'INACTIVA';
   }
-}
 
+  /// Crea una copia de la competencia con valores actualizados
+  Competencia copyWith({
+    int? id,
+    String? nombre,
+    DateTime? fechaHora,
+    String? categoria,
+    bool? activa,
+    bool? enCurso,
+    DateTime? fechaInicio,
+    DateTime? fechaFin,
+  }) {
+    return Competencia(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      fechaHora: fechaHora ?? this.fechaHora,
+      categoria: categoria ?? this.categoria,
+      activa: activa ?? this.activa,
+      enCurso: enCurso ?? this.enCurso,
+      fechaInicio: fechaInicio ?? this.fechaInicio,
+      fechaFin: fechaFin ?? this.fechaFin,
+    );
+  }
+}
