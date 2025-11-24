@@ -995,21 +995,6 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.upload, color: AppTheme.primaryColor),
-              title: const Text('Sincronizar Datos'),
-              subtitle: const Text('Enviar registros al servidor'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Sincronización iniciada...'),
-                    backgroundColor: AppTheme.secondaryColor,
-                  ),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
               leading: const Icon(
                 Icons.warning_amber_rounded,
                 color: Color(0xFFF57C00),
@@ -1362,73 +1347,6 @@ class _TimerScreenState extends State<TimerScreen> {
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Botón de control manual (SOLO DESARROLLO)
-                  if (!timerProvider.isCompleted)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: timerProvider.isRunning
-                                ? [
-                                    const Color(0xFFFFA726),
-                                    const Color(0xFFFF9800),
-                                  ]
-                                : [
-                                    const Color(0xFF43A047),
-                                    const Color(0xFF66BB6A),
-                                  ],
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
-                            BoxShadow(
-                              color:
-                                  (timerProvider.isRunning
-                                          ? const Color(0xFFFFA726)
-                                          : const Color(0xFF43A047))
-                                      .withOpacity(0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            if (timerProvider.isRunning) {
-                              timerProvider.pause();
-                            } else {
-                              timerProvider.start();
-                            }
-                          },
-                          icon: Icon(
-                            timerProvider.isRunning
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                            size: 22,
-                          ),
-                          label: Text(
-                            timerProvider.isRunning ? 'Pausar' : 'Iniciar',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
 
                   const SizedBox(height: 12),
 

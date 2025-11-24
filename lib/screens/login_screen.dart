@@ -68,35 +68,84 @@ class _LoginScreenState extends State<LoginScreen>
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      try {
-        await authProvider.login(
-          _nombreController.text.trim(),
-          _passwordController.text,
-        );
+      // Intentar login
+      final loginExitoso = await authProvider.login(
+        _nombreController.text.trim(),
+        _passwordController.text,
+      );
 
-        // Conectar WebSocket después del login exitoso
-        if (mounted && authProvider.juez != null) {
-          try {
-            await authProvider.connectWebSocket();
-            debugPrint('✅ WebSocket conectado después del login');
-          } catch (e) {
-            debugPrint('⚠️ Error conectando WebSocket: $e');
-            // No es crítico, continuar de todas formas
-          }
-        }
-
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/equipos');
-        }
-      } catch (e) {
+      // Si el login falló, mostrar error y NO navegar
+      if (!loginExitoso) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error al iniciar sesión: $e'),
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      authProvider.error ?? 'Error al iniciar sesión',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
               backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
         }
+        return; // NO navegar si falló el login
+      }
+
+      // Login exitoso - Verificar que tenemos datos antes de navegar
+      if (authProvider.juez == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.warning_amber_outlined, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Error: No se pudo cargar la información del usuario',
+                      style: TextStyle(fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange.shade700,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+        return; // NO navegar si no hay datos del juez
+      }
+
+      // Conectar WebSocket después del login exitoso
+      if (mounted) {
+        try {
+          await authProvider.connectWebSocket();
+          debugPrint('✅ WebSocket conectado después del login');
+        } catch (e) {
+          debugPrint('⚠️ Error conectando WebSocket: $e');
+          // No es crítico, continuar de todas formas
+        }
+      }
+
+      // Todo bien - navegar a la pantalla de equipos
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/equipos');
       }
     }
   }

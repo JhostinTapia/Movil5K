@@ -154,10 +154,18 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  // Obtener todos los registros
+  // Obtener todos los registros con información del equipo
   Future<List<Map<String, dynamic>>> obtenerTodosLosRegistros() async {
     final db = await database;
-    return await db.query('registros_tiempo', orderBy: 'timestamp DESC');
+    return await db.rawQuery('''
+      SELECT 
+        rt.*,
+        e.nombre as equipo_nombre,
+        e.dorsal as equipo_dorsal
+      FROM registros_tiempo rt
+      LEFT JOIN equipos e ON rt.equipo_id = e.id
+      ORDER BY rt.timestamp DESC
+    ''');
   }
 
   // Obtener registros pendientes de sincronizar

@@ -7,7 +7,11 @@ class ApiConfig {
       ? 'http://127.0.0.1:8000' // Para navegador web
       // ? 'http://192.168.1.13:8000' // Para navegador web
       // : 'http://10.20.137.84:8000'; // Para móvil (IP WiFi de tu laptop)
-      : 'http://192.168.1.13:8000'; // Para móvil (IP WiFi de tu laptop)
+      // : 'http://192.168.1.13:8000'; // Para móvil (IP WiFi de tu laptop)
+      // : 'http://10.20.142.171:8000'; // Para móvil (IP WiFi de tu laptop)
+      // : 'http://10.20.140.113:8000'; // Para móvil (IP WiFi de tu laptop)
+      // : 'http://10.20.142.147:8000'; // Para móvil (IP anterior)
+      : 'http://192.168.0.106:8000'; // Para móvil (IP WiFi de tu laptop)
 
   // static const String baseUrl = 'http://10.0.2.2:8000'; // Para emulador Android
   // static const String baseUrl = 'http://192.168.x.x:8000'; // Para otro dispositivo físico
