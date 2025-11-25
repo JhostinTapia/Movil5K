@@ -161,12 +161,11 @@ class AppRepository {
 
   // ==================== EQUIPOS ====================
 
-  /// Obtiene todos los equipos
-  Future<List<Equipo>> getEquipos({int? competenciaId, int? juezId}) async {
+  /// Obtiene todos los equipos (filtrados automáticamente por el juez autenticado en el servidor)
+  Future<List<Equipo>> getEquipos({int? competenciaId}) async {
     try {
       final data = await _apiService.getEquipos(
         competenciaId: competenciaId,
-        juezId: juezId,
       );
       return data.map((json) => Equipo.fromJson(json)).toList();
     } catch (e) {
@@ -310,22 +309,23 @@ class AppRepository {
     _webSocketService = null;
   }
 
+  /// Reconecta el WebSocket (desconecta y vuelve a conectar)
+  Future<void> reconnectWebSocket(int juezId) async {
+    await disconnectWebSocket();
+    await connectWebSocket(juezId);
+  }
+
   /// Stream de mensajes del WebSocket
   Stream<WebSocketMessage>? get webSocketMessages =>
       _webSocketService?.messages;
 
   /// Estado de conexión del WebSocket
   bool get isWebSocketConnected {
-    final isConnected = _webSocketService?.isConnected ?? false;
-    debugPrint('🔍 isWebSocketConnected check:');
-    debugPrint('   - _webSocketService es null: ${_webSocketService == null}');
-    debugPrint('   - isConnected: $isConnected');
-    return isConnected;
+    return _webSocketService?.isConnected ?? false;
   }
 
   /// Enviar mensaje por WebSocket
   void sendWebSocketMessage(Map<String, dynamic> message) {
-    debugPrint('📤 sendWebSocketMessage llamado');
     if (_webSocketService == null || !isWebSocketConnected) {
       debugPrint('❌ WebSocket no disponible para enviar');
       throw Exception('WebSocket no conectado');

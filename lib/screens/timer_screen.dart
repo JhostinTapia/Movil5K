@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -9,6 +10,7 @@ import '../models/competencia.dart';
 import '../widgets/time_mark_card.dart';
 import '../widgets/database_viewer_modal.dart';
 import '../services/connectivity_service.dart';
+import '../services/websocket_service.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -18,6 +20,8 @@ class TimerScreen extends StatefulWidget {
 }
 
 class _TimerScreenState extends State<TimerScreen> {
+  StreamSubscription? _wsMessageSubscription;
+  
   @override
   void initState() {
     super.initState();
@@ -36,8 +40,154 @@ class _TimerScreenState extends State<TimerScreen> {
         if (competencia != null) {
           timerProvider.setCompetencia(competencia);
         }
+        
+        // Escuchar mensajes del WebSocket (incluyendo errores)
+        _subscribeToWebSocketMessages(timerProvider);
       }
     });
+  }
+  
+  void _subscribeToWebSocketMessages(TimerProvider timerProvider) {
+    // Cancelar suscripción anterior si existe
+    _wsMessageSubscription?.cancel();
+    
+    // Obtener el stream de mensajes WebSocket desde AuthProvider
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final messageStream = authProvider.repository.webSocketMessages;
+    
+    if (messageStream == null) {
+      debugPrint('⚠️ No hay stream de WebSocket disponible');
+      return;
+    }
+    
+    // Escuchar mensajes del WebSocket
+    _wsMessageSubscription = messageStream.listen(
+      (message) {
+        if (!mounted) return;
+        
+        // Manejar mensajes de error
+        if (message.type == WebSocketMessageType.error) {
+          final errorMsg = message.data['mensaje'] as String? ?? 'Error de conexión';
+          final errorTecnico = message.data['error_tecnico'] as String?;
+          
+          _mostrarErrorWebSocket(errorMsg, errorTecnico);
+        }
+        // Aquí puedes agregar otros tipos de mensajes en el futuro
+      },
+    );
+  }
+  
+  void _mostrarErrorWebSocket(String mensaje, String? errorTecnico) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline, color: Colors.red.shade700, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Error de Conexión',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              mensaje,
+              style: const TextStyle(fontSize: 15, height: 1.5),
+            ),
+            if (errorTecnico != null && errorTecnico.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ExpansionTile(
+                title: const Text(
+                  'Detalles técnicos',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      errorTecnico,
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Volver a la pantalla de equipos
+              Navigator.of(context).pop();
+            },
+            child: const Text('Volver'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Intentar reconectar
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final juezId = authProvider.juez?.id;
+              
+              if (juezId != null) {
+                try {
+                  await authProvider.repository.reconnectWebSocket(juezId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Reconectando...'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al reconectar: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _wsMessageSubscription?.cancel();
+    super.dispose();
   }
 
   List<Color> _getEstadoColors(TimerProvider provider) {
@@ -987,6 +1137,12 @@ class _TimerScreenState extends State<TimerScreen> {
               title: const Text('Cerrar Sesión'),
               onTap: () {
                 Navigator.pop(context);
+                
+                // Limpiar estado del timer antes de cerrar sesión
+                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+                timerProvider.clearAll();
+                
+                // Cerrar sesión
                 Provider.of<AuthProvider>(context, listen: false).logout();
                 Navigator.pushReplacementNamed(context, '/login');
               },

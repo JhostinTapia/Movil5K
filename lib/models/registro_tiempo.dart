@@ -64,21 +64,31 @@ class RegistroTiempo {
 
   factory RegistroTiempo.fromJson(Map<String, dynamic> json) {
     return RegistroTiempo(
-      idRegistro: json['id_registro'] as String?,
-      equipoId: json['equipo_id'] as int,
-      tiempo: json['tiempo'] as int,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-      horas: json['horas'] as int? ?? 0,
-      minutos: json['minutos'] as int? ?? 0,
-      segundos: json['segundos'] as int? ?? 0,
-      milisegundos: json['milisegundos'] as int? ?? 0,
+      idRegistro: json['record_id'] as String?,
+      equipoId: json['team'] as int,
+      tiempo: json['time'] as int,
+      timestamp: DateTime.parse(json['created_at'] as String),
+      horas: json['hours'] as int? ?? 0,
+      minutos: json['minutes'] as int? ?? 0,
+      segundos: json['seconds'] as int? ?? 0,
+      milisegundos: json['milliseconds'] as int? ?? 0,
       sincronizado: json['sincronizado'] as bool? ?? false,
       penalizado: json['penalizado'] as bool? ?? false,
     );
   }
 
+  /// Para enviar al servidor (WebSocket)
   Map<String, dynamic> toJson() {
-    return {'timestamp': timestamp.toIso8601String(), 'tiempo': tiempo};
+    return {
+      'record_id': idRegistro,
+      'team': equipoId,
+      'time': tiempo,
+      'hours': horas,
+      'minutes': minutos,
+      'seconds': segundos,
+      'milliseconds': milisegundos,
+      'created_at': timestamp.toIso8601String(),
+    };
   }
 
   /// Para la base de datos local

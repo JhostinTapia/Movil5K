@@ -23,8 +23,30 @@ class ApiConfig {
 
   // WebSocket
   static String get wsBaseUrl => baseUrl.replaceFirst('http', 'ws');
+  
   static String webSocketUrl(int juezId, String token) {
-    return '$wsBaseUrl/ws/juez/$juezId/?token=$token';
+    // Limpiar el token de caracteres extras AGRESIVAMENTE
+    // Remover: espacios, saltos de línea, #, tabs, retornos de carro
+    String cleanToken = token.trim();
+    cleanToken = cleanToken.replaceAll(RegExp(r'[#\n\r\t\s]'), '');
+    
+    // IMPORTANTE: URL-encode el token para evitar problemas con caracteres especiales
+    // El problema es que web_socket_channel o Uri.parse() puede agregar # al final
+    // Uri.encodeComponent() codifica el token correctamente para URLs
+    final encodedToken = Uri.encodeComponent(cleanToken);
+    
+    // Debug: verificar si el token tenía caracteres inválidos
+    if (token != cleanToken) {
+      debugPrint('⚠️ Token contenía caracteres inválidos!');
+      debugPrint('   Original length: ${token.length}');
+      debugPrint('   Clean length: ${cleanToken.length}');
+      debugPrint('   Token original: "$token"');
+      debugPrint('   Token limpio: "$cleanToken"');
+    }
+    
+    final url = '$wsBaseUrl/ws/juez/$juezId/?token=$encodedToken';
+    debugPrint('🔗 URL WebSocket generada: $url');
+    return url;
   }
 
   // Timeouts

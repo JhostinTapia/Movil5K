@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/juez.dart';
 
@@ -13,26 +14,60 @@ class StorageService {
   /// Guardar tokens de autenticación
   Future<void> saveTokens(String accessToken, String refreshToken) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyAccessToken, accessToken);
-    await prefs.setString(_keyRefreshToken, refreshToken);
+    // Limpiar tokens AGRESIVAMENTE de espacios, saltos de línea, #, tabs, etc.
+    final cleanAccess = accessToken.trim().replaceAll(RegExp(r'[#\n\r\t]'), '');
+    final cleanRefresh = refreshToken.trim().replaceAll(RegExp(r'[#\n\r\t]'), '');
+    
+    await prefs.setString(_keyAccessToken, cleanAccess);
+    await prefs.setString(_keyRefreshToken, cleanRefresh);
   }
 
   /// Guardar solo el access token
   Future<void> saveAccessToken(String accessToken) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyAccessToken, accessToken);
+    // Limpiar token AGRESIVAMENTE de espacios, saltos de línea, #, tabs, etc.
+    final cleanToken = accessToken.trim().replaceAll(RegExp(r'[#\n\r\t]'), '');
+    await prefs.setString(_keyAccessToken, cleanToken);
   }
 
   /// Obtener access token
   Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyAccessToken);
+    final token = prefs.getString(_keyAccessToken);
+    
+    if (token == null) return null;
+    
+    // Limpiar token AGRESIVAMENTE de espacios y caracteres extras
+    final cleanToken = token.trim().replaceAll(RegExp(r'[#\n\r\t]'), '');
+    
+    // Si el token estaba corrupto, guardarlo limpio (migración automática)
+    if (token != cleanToken) {
+      debugPrint('🔧 Token corrupto detectado - Aplicando limpieza automática');
+      debugPrint('   Token original length: ${token.length}');
+      debugPrint('   Token limpio length: ${cleanToken.length}');
+      await prefs.setString(_keyAccessToken, cleanToken);
+    }
+    
+    return cleanToken;
   }
 
   /// Obtener refresh token
   Future<String?> getRefreshToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyRefreshToken);
+    final token = prefs.getString(_keyRefreshToken);
+    
+    if (token == null) return null;
+    
+    // Limpiar token AGRESIVAMENTE de espacios y caracteres extras
+    final cleanToken = token.trim().replaceAll(RegExp(r'[#\n\r\t]'), '');
+    
+    // Si el token estaba corrupto, guardarlo limpio (migración automática)
+    if (token != cleanToken) {
+      debugPrint('🔧 Refresh token corrupto detectado - Aplicando limpieza automática');
+      await prefs.setString(_keyRefreshToken, cleanToken);
+    }
+    
+    return cleanToken;
   }
 
   /// Guardar información del juez

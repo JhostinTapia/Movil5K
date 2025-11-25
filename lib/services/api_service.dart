@@ -208,11 +208,50 @@ class ApiService {
 
   /// Login de juez (no requiere autenticación)
   Future<Map<String, dynamic>> login(String username, String password) async {
-    return await post(
+    final response = await post(
       '/api/login/',
       body: {'username': username, 'password': password},
       requiresAuth: false,
     );
+    
+    // DEBUG: Ver qué viene del servidor
+    print('🔍 Response del servidor:');
+    print('   access type: ${response['access'].runtimeType}');
+    print('   access length: ${(response['access'] as String).length}');
+    print('   access value: "${response['access']}"');
+    print('   Tiene #: ${(response['access'] as String).contains('#')}');
+    
+    // IMPORTANTE: Limpiar tokens INMEDIATAMENTE después de recibirlos del servidor
+    // El servidor Django a veces envía tokens con caracteres extra (#, espacios, etc.)
+    if (response.containsKey('access')) {
+      final originalAccess = response['access'] as String;
+      final cleanAccess = originalAccess
+          .trim()
+          .replaceAll(RegExp(r'[#\n\r\t]'), '');
+      response['access'] = cleanAccess;
+      
+      if (originalAccess != cleanAccess) {
+        print('⚠️ Token access tenía caracteres inválidos!');
+        print('   Original length: ${originalAccess.length}');
+        print('   Clean length: ${cleanAccess.length}');
+      } else {
+        print('✅ Token access estaba limpio');
+      }
+    }
+    
+    if (response.containsKey('refresh')) {
+      final originalRefresh = response['refresh'] as String;
+      final cleanRefresh = originalRefresh
+          .trim()
+          .replaceAll(RegExp(r'[#\n\r\t]'), '');
+      response['refresh'] = cleanRefresh;
+      
+      if (originalRefresh != cleanRefresh) {
+        print('⚠️ Token refresh tenía caracteres inválidos!');
+      }
+    }
+    
+    return response;
   }
 
   /// Logout (requiere autenticación)
@@ -241,8 +280,8 @@ class ApiService {
   /// Obtener competencias
   Future<List<dynamic>> getCompetencias({bool? activa, bool? enCurso}) async {
     final params = <String, String>{};
-    if (activa != null) params['activa'] = activa.toString();
-    if (enCurso != null) params['en_curso'] = enCurso.toString();
+    if (activa != null) params['is_active'] = activa.toString();
+    if (enCurso != null) params['is_running'] = enCurso.toString();
 
     final response = await get(
       '/api/competencias/',
@@ -262,12 +301,11 @@ class ApiService {
     return await get('/api/competencias/$id/');
   }
 
-  /// Obtener equipos
-  Future<List<dynamic>> getEquipos({int? competenciaId, int? juezId}) async {
+  /// Obtener equipos (filtrados automáticamente por el juez autenticado)
+  Future<List<dynamic>> getEquipos({int? competenciaId}) async {
     final params = <String, String>{};
     if (competenciaId != null)
-      params['competencia_id'] = competenciaId.toString();
-    if (juezId != null) params['juez_id'] = juezId.toString();
+      params['competition_id'] = competenciaId.toString();
 
     final response = await get(
       '/api/equipos/',

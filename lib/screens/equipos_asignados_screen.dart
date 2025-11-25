@@ -64,6 +64,11 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         isLoading = false;
       });
 
+      // Mostrar advertencia si no hay equipos asignados
+      if (equiposFiltrados.isEmpty && mounted) {
+        _mostrarAdvertenciaNoEquipos();
+      }
+
       _controller.forward();
     } catch (e) {
       setState(() {
@@ -72,12 +77,73 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al cargar equipos: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Error al cargar equipos: $e')),
+              ],
+            ),
             backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              textColor: Colors.white,
+              onPressed: _cargarEquipos,
+            ),
           ),
         );
       }
     }
+  }
+  
+  void _mostrarAdvertenciaNoEquipos() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Sin Equipos Asignados',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'No tienes equipos asignados en este momento.',
+              style: TextStyle(fontSize: 15, height: 1.5),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Por favor, contacta al administrador para que te asigne un equipo y puedas comenzar a registrar tiempos.',
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _seleccionarEquipo(Equipo equipo) {
@@ -144,6 +210,11 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 size: 24,
                               ),
                               onPressed: () {
+                                // Limpiar estado del timer antes de cerrar sesión
+                                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+                                timerProvider.clearAll();
+                                
+                                // Cerrar sesión
                                 authProvider.logout();
                                 Navigator.pushReplacementNamed(
                                   context,

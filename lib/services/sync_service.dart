@@ -100,13 +100,15 @@ class SyncService {
     );
 
     // Construir payload según el formato esperado por el backend WebSocket
-    // Ver app/consumers.py - manejar_registro_tiempos_batch
+    // Ver app/websocket/consumers.py - manejar_registro_tiempos_batch
+    // Formato: {"tipo": "registrar_tiempos", "equipo_id": 1, "registros": [...]}
     final payload = {
       'tipo': 'registrar_tiempos',
       'equipo_id': equipoId,
       'registros': registros
           .map(
             (r) => {
+              'id_registro': r.idRegistro, // UUID para idempotencia
               'tiempo': r.tiempo,
               'horas': r.horas,
               'minutos': r.minutos,

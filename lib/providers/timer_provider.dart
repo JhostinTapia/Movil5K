@@ -267,30 +267,42 @@ class TimerProvider extends ChangeNotifier {
         // Notificar cambios para actualizar la UI del countdown
         notifyListeners();
 
-        // Refrescar competencia desde el servidor cada 10 segundos
+        // Refrescar competencia desde el servidor solo si WebSocket NO está conectado (fallback)
+        // Cada 10 segundos como respaldo
         if (timer.tick % 10 == 0) {
-          try {
-            final competencia = await _repository.getCompetencia(
-              _competenciaActual!.id,
-            );
-            final anteriorEnCurso = _competenciaActual!.enCurso;
-            _competenciaActual = competencia;
+          // Solo hacer polling si WebSocket está desconectado
+          final isWebSocketConnected = _repository.isWebSocketConnected;
+          
+          if (!isWebSocketConnected) {
+            debugPrint('Polling fallback: WebSocket desconectado, consultando API');
+            try {
+              final competencia = await _repository.getCompetencia(
+                _competenciaActual!.id,
+              );
+              final anteriorEnCurso = _competenciaActual!.enCurso;
+              _competenciaActual = competencia;
 
-            // Si la competencia está en curso y el cronómetro no está corriendo, iniciarlo
-            if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
-              if (!anteriorEnCurso) {
-                debugPrint(
-                  '🚀 Competencia cambió a EN CURSO - Iniciando cronómetro',
-                );
-              } else {
-                debugPrint(
-                  '🚀 Competencia está EN CURSO pero cronómetro detenido - Iniciando',
-                );
+              // Si la competencia está en curso y el cronómetro no está corriendo, iniciarlo
+              if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
+                if (!anteriorEnCurso) {
+                  debugPrint(
+                    'Competencia cambió a EN CURSO - Iniciando cronómetro',
+                  );
+                } else {
+                  debugPrint(
+                    'Competencia está EN CURSO pero cronómetro detenido - Iniciando',
+                  );
+                }
+                start();
               }
-              start();
+            } catch (e) {
+              debugPrint('Error refrescando competencia: $e');
             }
-          } catch (e) {
-            debugPrint('Error refrescando competencia: $e');
+          } else {
+            // WebSocket conectado, no hacer polling
+            if (timer.tick == 10) {
+              debugPrint('WebSocket activo: polling deshabilitado (usando actualizaciones en tiempo real)');
+            }
           }
         }
       }
@@ -771,6 +783,41 @@ class TimerProvider extends ChangeNotifier {
     _registros.clear();
     await _cargarRegistrosGuardados();
 
+    notifyListeners();
+  }
+  
+  /// Limpia completamente el estado (usado en logout)
+  void clearAll() {
+    debugPrint('🧹 TimerProvider: Limpiando todo el estado (logout)');
+    
+    // Detener cronómetro
+    if (_stopwatch.isRunning) {
+      _stopwatch.stop();
+    }
+    _stopwatch.reset();
+    
+    // Cancelar todos los timers
+    _timer?.cancel();
+    _timer = null;
+    _checkTimer?.cancel();
+    _checkTimer = null;
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = null;
+    
+    // Cancelar suscripción WebSocket
+    _webSocketSubscription?.cancel();
+    _webSocketSubscription = null;
+    
+    // Limpiar datos
+    _registros.clear();
+    _equipoActual = null;
+    _competenciaActual = null;
+    _isCompleted = false;
+    _isSyncing = false;
+    _registrosPendientes = 0;
+    _tiempoInicioOffset = 0;
+    _envioCompleter = null;
+    
     notifyListeners();
   }
 
