@@ -41,6 +41,13 @@ class _TimerScreenState extends State<TimerScreen> {
           timerProvider.setCompetencia(competencia);
         }
         
+        // Conectar el TimerProvider al WebSocket
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.juez != null) {
+          timerProvider.connectWebSocket(authProvider.juez!.id);
+          debugPrint('🔌 TimerProvider conectado al WebSocket');
+        }
+        
         // Escuchar mensajes del WebSocket (incluyendo errores)
         _subscribeToWebSocketMessages(timerProvider);
       }

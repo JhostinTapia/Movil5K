@@ -130,6 +130,12 @@ class TimerProvider extends ChangeNotifier {
 
   /// Establece la competencia actual y configura el monitoreo
   Future<void> setCompetencia(Competencia competencia) async {
+    debugPrint('🏁 ESTABLECIENDO COMPETENCIA:');
+    debugPrint('   - ID: ${competencia.id}');
+    debugPrint('   - Nombre: ${competencia.nombre}');
+    debugPrint('   - En curso: ${competencia.enCurso}');
+    debugPrint('   - Activa: ${competencia.activa}');
+    
     _competenciaActual = competencia;
 
     // El cronómetro SOLO se inicia cuando la competencia está marcada como "en curso"
@@ -140,7 +146,8 @@ class TimerProvider extends ChangeNotifier {
       );
       start();
     } else if (!competencia.enCurso) {
-      debugPrint('⏸️ La competencia NO está activa - Cronómetro en espera');
+      debugPrint('⏸️ La competencia NO está en curso - Cronómetro en espera');
+      debugPrint('   ⚠️ Esperando mensaje WebSocket de inicio...');
     }
 
     await _iniciarMonitoreoCompetencia();
@@ -150,6 +157,14 @@ class TimerProvider extends ChangeNotifier {
   /// Conecta al WebSocket para recibir notificaciones
   Future<void> connectWebSocket(int juezId) async {
     try {
+      debugPrint('🔌 CONECTANDO WEBSOCKET para juez $juezId');
+      if (_competenciaActual != null) {
+        debugPrint('   📊 Competencia cargada: ${_competenciaActual!.nombre} (ID: ${_competenciaActual!.id})');
+        debugPrint('   📊 En curso: ${_competenciaActual!.enCurso}');
+      } else {
+        debugPrint('   ⚠️ No hay competencia cargada aún');
+      }
+      
       await _repository.connectWebSocket(juezId);
 
       // Escuchar mensajes del WebSocket
@@ -158,71 +173,106 @@ class TimerProvider extends ChangeNotifier {
         onError: (error) => debugPrint('Error en WebSocket: $error'),
       );
 
-      debugPrint('WebSocket conectado para juez $juezId');
+      debugPrint('✅ WebSocket listener configurado para juez $juezId');
     } catch (e) {
-      debugPrint('Error conectando WebSocket: $e');
+      debugPrint('❌ Error conectando WebSocket: $e');
     }
   }
 
   /// Maneja los mensajes recibidos por WebSocket
   void _handleWebSocketMessage(dynamic message) {
-    debugPrint('Mensaje WebSocket: $message');
-
-    if (message is Map<String, dynamic>) {
-      final type = message['type'] as String?;
-      final data = message['data'] as Map<String, dynamic>?;
-
-      switch (type) {
-        case 'carrera.iniciada':
-          _handleCarreraIniciada(data);
+    debugPrint('📨 Mensaje WebSocket recibido en TimerProvider');
+    
+    // El mensaje ya viene como WebSocketMessage desde el repository
+    if (message is WebSocketMessage) {
+      debugPrint('📨 Tipo: ${message.type}');
+      debugPrint('📨 Datos: ${message.data}');
+      
+      switch (message.type) {
+        case WebSocketMessageType.competenciaIniciada:
+        case WebSocketMessageType.carreraIniciada:
+          debugPrint('🏁 COMPETENCIA INICIADA - Iniciando cronómetro');
+          _handleCarreraIniciada(message.data);
           break;
-        case 'carrera.detenida':
-          _handleCarreraDetenida(data);
+          
+        case WebSocketMessageType.competenciaDetenida:
+        case WebSocketMessageType.carreraDetenida:
+          debugPrint('🛑 COMPETENCIA DETENIDA - Pausando cronómetro');
+          _handleCarreraDetenida(message.data);
           break;
-        case 'competencia.actualizada':
-          _handleCompetenciaActualizada(data);
+          
+        case WebSocketMessageType.conexionEstablecida:
+          debugPrint('✅ Conexión WebSocket establecida');
+          // Si la competencia viene en curso, iniciar cronómetro
+          final competencia = message.data['competencia'] as Map<String, dynamic>?;
+          if (competencia != null) {
+            final enCurso = competencia['en_curso'] as bool?;
+            if (enCurso == true && !_stopwatch.isRunning) {
+              debugPrint('🏁 Competencia ya estaba en curso - Iniciando cronómetro');
+              _handleCarreraIniciada(competencia);
+            }
+          }
           break;
+          
         default:
-          debugPrint('Tipo de mensaje desconocido: $type');
+          debugPrint('Tipo de mensaje: ${message.type}');
       }
+    } else {
+      debugPrint('⚠️ Mensaje no es WebSocketMessage: ${message.runtimeType}');
     }
   }
 
   /// Maneja el evento de carrera iniciada
   void _handleCarreraIniciada(Map<String, dynamic>? data) {
-    debugPrint('Carrera iniciada: $data');
+    debugPrint('🏁 PROCESANDO INICIO DE COMPETENCIA');
+    debugPrint('   Datos recibidos: $data');
+    debugPrint('   Cronómetro corriendo: ${_stopwatch.isRunning}');
+    debugPrint('   Completado: $_isCompleted');
+    debugPrint('   Competencia actual: $_competenciaActual');
 
     // Iniciar cronómetro automáticamente
     if (!_stopwatch.isRunning && !_isCompleted) {
+      debugPrint('✅ INICIANDO CRONÓMETRO AUTOMÁTICAMENTE');
       start();
 
       // Actualizar estado de competencia
-      if (_competenciaActual != null && data != null) {
+      if (_competenciaActual != null) {
         _competenciaActual = _competenciaActual!.copyWith(
           enCurso: true,
           fechaInicio: DateTime.now(),
         );
+        debugPrint('✅ Estado de competencia actualizado: EN CURSO');
         notifyListeners();
+      } else {
+        debugPrint('⚠️ No hay competencia actual cargada');
       }
+    } else {
+      debugPrint('⚠️ No se inició cronómetro - Ya está corriendo: ${_stopwatch.isRunning}, Completado: $_isCompleted');
     }
   }
 
   /// Maneja el evento de carrera detenida
   void _handleCarreraDetenida(Map<String, dynamic>? data) {
-    debugPrint('Carrera detenida: $data');
+    debugPrint('🛑 PROCESANDO DETENCIÓN DE COMPETENCIA');
+    debugPrint('Datos recibidos: $data');
+    debugPrint('Cronómetro corriendo: ${_stopwatch.isRunning}');
 
     // Pausar cronómetro
     if (_stopwatch.isRunning) {
+      debugPrint('⏸️ PAUSANDO CRONÓMETRO AUTOMÁTICAMENTE');
       pause();
 
       // Actualizar estado de competencia
-      if (_competenciaActual != null && data != null) {
+      if (_competenciaActual != null) {
         _competenciaActual = _competenciaActual!.copyWith(
           enCurso: false,
           fechaFin: DateTime.now(),
         );
+        debugPrint('✅ Estado de competencia actualizado: DETENIDA');
         notifyListeners();
       }
+    } else {
+      debugPrint('⚠️ No se pausó cronómetro - Ya está detenido');
     }
   }
 
