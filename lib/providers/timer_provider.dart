@@ -19,6 +19,7 @@ class TimerProvider extends ChangeNotifier {
   Competencia? _competenciaActual;
   bool _isCompleted = false;
   bool _isSyncing = false;
+  bool _datosEnviados = false;
   int _registrosPendientes = 0;
   StreamSubscription? _webSocketSubscription;
   int _tiempoInicioOffset =
@@ -53,6 +54,7 @@ class TimerProvider extends ChangeNotifier {
   bool get canAddMore => _registros.length < maxParticipantes;
   bool get hasPendingSync => _registrosPendientes > 0;
   bool get isWebSocketConnected => _repository.isWebSocketConnected;
+  bool get datosEnviados => _datosEnviados;
 
   // Getters individuales para componentes de tiempo
   int get horas => elapsedMilliseconds ~/ 3600000;
@@ -109,6 +111,7 @@ class TimerProvider extends ChangeNotifier {
   Future<void> setEquipo(Equipo equipo) async {
     debugPrint('👥 Estableciendo equipo: ${equipo.nombre} (ID: ${equipo.id})');
     _equipoActual = equipo;
+    _datosEnviados = false; // Resetear flag al cambiar de equipo
 
     // Cargar registros desde BD local para continuar donde se quedó
     await reloadRegistros();
@@ -625,6 +628,12 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('🚀 enviarRegistrosPorWebSocket() INICIADO');
     debugPrint('   - _isSyncing: $_isSyncing');
     debugPrint('   - _equipoActual: ${_equipoActual?.nombre}');
+    debugPrint('   - _datosEnviados: $_datosEnviados');
+
+    if (_datosEnviados) {
+      debugPrint('⚠️ Los datos ya fueron enviados anteriormente');
+      return {'success': false, 'message': 'Los datos ya fueron enviados', 'yaEnviado': true};
+    }
 
     if (_isSyncing) {
       debugPrint('⚠️ Envío ya en progreso');
@@ -766,6 +775,9 @@ class TimerProvider extends ChangeNotifier {
           }
         }
         debugPrint('✅ Todos los registros marcados como sincronizados');
+        
+        // Marcar que los datos fueron enviados exitosamente
+        _datosEnviados = true;
       }
 
       _isSyncing = false;

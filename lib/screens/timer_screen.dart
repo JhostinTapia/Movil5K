@@ -572,6 +572,89 @@ class _TimerScreenState extends State<TimerScreen> {
   Future<void> _enviarDatos(BuildContext context) async {
     final timerProvider = Provider.of<TimerProvider>(context, listen: false);
 
+    // Verificar si los datos ya fueron enviados
+    if (timerProvider.datosEnviados) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFA726), Color(0xFFFF9800)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Datos Ya Enviados',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Los datos de este equipo ya fueron enviados al servidor exitosamente.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.9),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFFFFA726),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
     // Guardar referencia al Navigator ANTES de cualquier operación async
     final navigator = Navigator.of(context);
 
@@ -1405,27 +1488,40 @@ class _TimerScreenState extends State<TimerScreen> {
                           Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                              ),
+                              gradient: timerProvider.datosEnviados
+                                  ? const LinearGradient(
+                                      colors: [Colors.grey, Colors.grey],
+                                    )
+                                  : const LinearGradient(
+                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                    ),
                               borderRadius: BorderRadius.circular(15),
                               boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF667eea,
-                                  ).withOpacity(0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 5),
-                                ),
+                                if (!timerProvider.datosEnviados)
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF667eea,
+                                    ).withOpacity(0.4),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 5),
+                                  ),
                               ],
                             ),
                             child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  _mostrarConfirmacionEnvio(context),
-                              icon: const Icon(Icons.cloud_upload, size: 20),
-                              label: const Text(
-                                'Enviar Data Recolectada',
-                                style: TextStyle(
+                              onPressed: timerProvider.datosEnviados
+                                  ? null
+                                  : () => _mostrarConfirmacionEnvio(context),
+                              icon: Icon(
+                                timerProvider.datosEnviados
+                                    ? Icons.check_circle
+                                    : Icons.cloud_upload,
+                                size: 20,
+                              ),
+                              label: Text(
+                                timerProvider.datosEnviados
+                                    ? 'Datos Ya Enviados'
+                                    : 'Enviar Data Recolectada',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.5,
@@ -1435,6 +1531,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
                                 foregroundColor: Colors.white,
+                                disabledForegroundColor: Colors.white70,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
