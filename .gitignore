@@ -1,45 +1,58 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ------------------------------------
+# Archivos generados por Dart/Flutter
+# ------------------------------------
+/build/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+**/doc/api/
+/ios/Flutter/.last_build_id
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+# ------------------------------------
+# Archivos de Plataformas
+# ------------------------------------
+# Android
+/android/local.properties
+/android/.gradle/
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build
+
+# iOS/macOS
+/ios/.symlinks/
+/ios/Pods/
+/ios/.generated/
+/macos/.generated/
+
+# Otros builds específicos
+/linux/build
+/web/build
+/windows/build
+
+# ------------------------------------
+# IDEs y Sistema Operativo
+# ------------------------------------
+.DS_Store
+*.iml
+*.iws
+*.ipr
+.idea/
+.vscode/
+
+# Misceláneos
+*.log
+*.class
+*.pyc
+*.swp
+
+# Archivos generados de registro de plugins para plataformas
+/linux/.generated/
+/macos/.generated/
+/windows/.generated/
+
+# Archivos de cmake generados para desktop
+**/generated_plugins.cmake
+**/generated_plugin_registrant.*

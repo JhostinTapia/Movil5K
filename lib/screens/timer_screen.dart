@@ -50,41 +50,16 @@ class _TimerScreenState extends State<TimerScreen> {
     if (provider.isRunning) {
       return [const Color(0xFF667eea), const Color(0xFF764ba2)];
     }
-    if (provider.competenciaActual?.estaPorComenzar ?? false) {
-      return [const Color(0xFFFFA726), const Color(0xFFFF9800)];
-    }
     return [Colors.grey.shade400, Colors.grey.shade500];
   }
 
   IconData _getEstadoIcon(TimerProvider provider) {
     if (provider.isCompleted) return Icons.check_circle;
     if (provider.isRunning) return Icons.play_circle_filled;
-    if (provider.competenciaActual?.estaPorComenzar ?? false) {
-      return Icons.schedule;
-    }
     return Icons.pause_circle;
   }
 
-  String _getTiempoRestante(TimerProvider provider) {
-    if (provider.competenciaActual == null) return '';
 
-    final tiempoRestante = provider.tiempoHastaInicio;
-    if (tiempoRestante == null || tiempoRestante.inSeconds <= 0) {
-      return 'Iniciando automáticamente...';
-    }
-
-    final horas = tiempoRestante.inHours;
-    final minutos = tiempoRestante.inMinutes.remainder(60);
-    final segundos = tiempoRestante.inSeconds.remainder(60);
-
-    if (horas > 0) {
-      return 'Inicia en: ${horas}h ${minutos}m';
-    } else if (minutos > 0) {
-      return 'Inicia en: ${minutos}m ${segundos}s';
-    } else {
-      return 'Inicia en: ${segundos}s ⚡';
-    }
-  }
 
   void _mostrarConfirmacionEnvio(BuildContext context) async {
     final connectivityService = ConnectivityService();
@@ -1260,44 +1235,6 @@ class _TimerScreenState extends State<TimerScreen> {
                                   ),
                           ),
                         ),
-                        // Mostrar tiempo faltante si está por comenzar
-                        if (timerProvider.competenciaActual?.estaPorComenzar ??
-                            false) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.orange.shade200,
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  color: Colors.orange.shade700,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _getTiempoRestante(timerProvider),
-                                  style: TextStyle(
-                                    color: Colors.orange.shade900,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                         // Botón de envío cuando se completa
                         if (timerProvider.isCompleted)
                           const SizedBox(height: 20),
