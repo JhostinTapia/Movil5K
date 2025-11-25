@@ -344,7 +344,7 @@ class WebSocketService {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (timer) {
       if (isConnected) {
-        send({'action': 'ping'});
+        send({'tipo': 'ping'});
         print('Heartbeat enviado');
       }
     });
