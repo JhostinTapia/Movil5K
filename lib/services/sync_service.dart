@@ -99,13 +99,22 @@ class SyncService {
       '📤 Enviando ${registros.length} registros por WebSocket para equipo $equipoId',
     );
 
+    // Asegurar máximo 15 registros por envío para respetar el límite del servidor
+    final registrosAEnviar = registros.length > maxRegistrosPorLote 
+        ? registros.sublist(0, maxRegistrosPorLote) 
+        : registros;
+
+    if (registros.length > maxRegistrosPorLote) {
+      print('⚠️ Se intentaron enviar ${registros.length} registros. Se recortó a $maxRegistrosPorLote.');
+    }
+
     // Construir payload según el formato esperado por el backend WebSocket
     // Ver app/websocket/consumers.py - manejar_registro_tiempos_batch
     // Formato: {"tipo": "registrar_tiempos", "equipo_id": 1, "registros": [...]}
     final payload = {
       'tipo': 'registrar_tiempos',
       'equipo_id': equipoId,
-      'registros': registros
+      'registros': registrosAEnviar
           .map(
             (r) => {
               'id_registro': r.idRegistro, // UUID para idempotencia

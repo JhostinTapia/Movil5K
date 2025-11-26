@@ -231,6 +231,16 @@ class AppRepository {
     }
   }
 
+  /// Verifica si un equipo ya tiene registros sincronizados
+  Future<bool> equipoTieneRegistrosSincronizados(int equipoId) async {
+    try {
+      return await _databaseService.equipoTieneRegistrosSincronizados(equipoId);
+    } catch (e) {
+      debugPrint('Error verificando registros sincronizados: $e');
+      return false;
+    }
+  }
+
   // ==================== SINCRONIZACIÓN ====================
 
   /// Sincroniza los registros pendientes con el servidor

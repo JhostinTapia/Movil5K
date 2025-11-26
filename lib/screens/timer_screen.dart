@@ -25,7 +25,7 @@ class _TimerScreenState extends State<TimerScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
@@ -36,10 +36,14 @@ class _TimerScreenState extends State<TimerScreen> {
         final equipo = args['equipo'] as Equipo;
         final competencia = args['competencia'] as Competencia?;
 
-        timerProvider.setEquipo(equipo);
+        // Primero establecer la competencia para que el cronómetro
+        // se sincronice correctamente con el estado de ESTA competencia
         if (competencia != null) {
-          timerProvider.setCompetencia(competencia);
+          await timerProvider.setCompetencia(competencia);
         }
+        
+        // Luego establecer el equipo
+        await timerProvider.setEquipo(equipo);
         
         // Conectar el TimerProvider al WebSocket
         final authProvider = Provider.of<AuthProvider>(context, listen: false);

@@ -111,12 +111,20 @@ class TimerProvider extends ChangeNotifier {
   Future<void> setEquipo(Equipo equipo) async {
     debugPrint('👥 Estableciendo equipo: ${equipo.nombre} (ID: ${equipo.id})');
     _equipoActual = equipo;
-    _datosEnviados = false; // Resetear flag al cambiar de equipo
+
+    // Verificar si el equipo ya tiene registros sincronizados
+    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
+    _datosEnviados = yaEnviado;
+    
+    if (yaEnviado) {
+      debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados previamente');
+    }
 
     // Cargar registros desde BD local para continuar donde se quedó
     await reloadRegistros();
 
     debugPrint('   - Registros cargados desde BD: ${_registros.length}');
+    debugPrint('   - Datos enviados previamente: $_datosEnviados');
 
     // Si ya tiene 15 registros, marcar como completado
     if (_registros.length >= maxParticipantes) {
@@ -141,15 +149,17 @@ class TimerProvider extends ChangeNotifier {
     
     _competenciaActual = competencia;
 
-    // El cronómetro SOLO se inicia cuando la competencia está marcada como "en curso"
-    // La hora de inicio es solo referencial
+    // IMPORTANTE: El cronómetro SOLO se inicia si competencia.enCurso == true
+    // enCurso corresponde al campo isRunning del servidor (NO isActive)
+    // - isActive (activa): indica si la competencia existe (borrado lógico)
+    // - isRunning (enCurso): indica si la competencia está en curso
     if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
       debugPrint(
-        '🚀 La competencia está EN CURSO (activa) - Iniciando cronómetro',
+        '🚀 La competencia está EN CURSO (isRunning=true) - Iniciando cronómetro',
       );
       start();
     } else if (!competencia.enCurso) {
-      debugPrint('⏸️ La competencia NO está en curso - Cronómetro en espera');
+      debugPrint('⏸️ La competencia NO está en curso (isRunning=false) - Cronómetro en espera');
       debugPrint('   ⚠️ Esperando mensaje WebSocket de inicio...');
     }
 
@@ -184,10 +194,14 @@ class TimerProvider extends ChangeNotifier {
 
   /// Maneja los mensajes recibidos por WebSocket
   void _handleWebSocketMessage(dynamic message) {
-    debugPrint('📨 Mensaje WebSocket recibido en TimerProvider');
-    
     // El mensaje ya viene como WebSocketMessage desde el repository
     if (message is WebSocketMessage) {
+      // Ignorar mensajes de pong (heartbeat)
+      if (message.type == WebSocketMessageType.pong) {
+        return;
+      }
+      
+      debugPrint('📨 Mensaje WebSocket recibido en TimerProvider');
       debugPrint('📨 Tipo: ${message.type}');
       debugPrint('📨 Datos: ${message.data}');
       
@@ -215,6 +229,10 @@ class TimerProvider extends ChangeNotifier {
               _handleCarreraIniciada(competencia);
             }
           }
+          break;
+          
+        case WebSocketMessageType.pong:
+          // Ignorar pong - es solo respuesta al heartbeat
           break;
           
         default:
@@ -630,19 +648,21 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   - _equipoActual: ${_equipoActual?.nombre}');
     debugPrint('   - _datosEnviados: $_datosEnviados');
 
-    if (_datosEnviados) {
+    if (_equipoActual == null) {
+      debugPrint('⚠️ No hay equipo seleccionado');
+      return {'success': false, 'message': 'No hay equipo seleccionado'};
+    }
+
+    // Verificar nuevamente si el equipo ya tiene datos sincronizados
+    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(_equipoActual!.id);
+    if (yaEnviado || _datosEnviados) {
       debugPrint('⚠️ Los datos ya fueron enviados anteriormente');
-      return {'success': false, 'message': 'Los datos ya fueron enviados', 'yaEnviado': true};
+      return {'success': false, 'message': 'Los datos de este equipo ya fueron enviados al servidor', 'yaEnviado': true};
     }
 
     if (_isSyncing) {
       debugPrint('⚠️ Envío ya en progreso');
       return {'success': false, 'message': 'Envío en progreso'};
-    }
-
-    if (_equipoActual == null) {
-      debugPrint('⚠️ No hay equipo seleccionado');
-      return {'success': false, 'message': 'No hay equipo seleccionado'};
     }
 
     _isSyncing = true;

@@ -16,6 +16,7 @@ enum WebSocketMessageType {
   tiemposRegistradosBatch,
   equipoAsignado,
   sincronizacionCompletada,
+  pong,
   error,
   unknown,
 }
@@ -66,6 +67,8 @@ class WebSocketMessage {
         return WebSocketMessageType.equipoAsignado;
       case 'sincronizacion.completada':
         return WebSocketMessageType.sincronizacionCompletada;
+      case 'pong':
+        return WebSocketMessageType.pong;
       case 'error':
         return WebSocketMessageType.error;
       default:
@@ -256,7 +259,10 @@ class WebSocketService {
 
     try {
       final jsonMessage = json.encode(message);
-      print('📤 Enviando mensaje: $jsonMessage');
+      // Solo loguear mensajes importantes (no ping)
+      if (message['tipo'] != 'ping') {
+        print('📤 Enviando mensaje: $jsonMessage');
+      }
       _channel?.sink.add(jsonMessage);
     } catch (e) {
       print('❌ Error enviando mensaje: $e');
@@ -271,8 +277,11 @@ class WebSocketService {
 
       _messageController.add(message);
 
-      print('📨 Mensaje recibido: ${message.type}');
-      print('📨 Datos completos: $json');
+      // Solo loguear mensajes importantes (no pong)
+      if (message.type != WebSocketMessageType.pong) {
+        print('📨 Mensaje recibido: ${message.type}');
+        print('📨 Datos completos: $json');
+      }
     } catch (e) {
       print('❌ Error procesando mensaje: $e');
     }
