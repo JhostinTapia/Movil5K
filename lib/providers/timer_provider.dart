@@ -22,6 +22,11 @@ class TimerProvider extends ChangeNotifier {
   bool _datosEnviados = false;
   int _registrosPendientes = 0;
   StreamSubscription? _webSocketSubscription;
+  
+  // Sincronización con servidor
+  DateTime? _serverStartedAt; // Timestamp de inicio desde el servidor
+  DateTime? _serverFinishedAt; // Timestamp de finalización desde el servidor
+  
   int _tiempoInicioOffset =
       0; // Offset para sincronizar con hora real de inicio
   Completer<Map<String, dynamic>>?
@@ -41,8 +46,16 @@ class TimerProvider extends ChangeNotifier {
   static const Duration autoSyncInterval = Duration(minutes: 5);
 
   // Getters
-  int get elapsedMilliseconds =>
-      _stopwatch.elapsedMilliseconds + _tiempoInicioOffset;
+  int get elapsedMilliseconds {
+    // Si tenemos el timestamp del servidor, calcular basándose en él
+    if (_serverStartedAt != null) {
+      final now = DateTime.now();
+      final elapsed = now.difference(_serverStartedAt!);
+      return elapsed.inMilliseconds;
+    }
+    // Fallback al stopwatch local (para compatibilidad)
+    return _stopwatch.elapsedMilliseconds + _tiempoInicioOffset;
+  }
   List<RegistroTiempo> get registros => List.unmodifiable(_registros);
   bool get isRunning => _stopwatch.isRunning;
   bool get isCompleted => _isCompleted;
@@ -146,8 +159,15 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   - Nombre: ${competencia.nombre}');
     debugPrint('   - En curso: ${competencia.enCurso}');
     debugPrint('   - Activa: ${competencia.activa}');
+    debugPrint('   - Fecha inicio: ${competencia.fechaInicio}');
     
     _competenciaActual = competencia;
+
+    // Si la competencia ya está en curso, sincronizar con el timestamp del servidor
+    if (competencia.enCurso && competencia.fechaInicio != null) {
+      _serverStartedAt = competencia.fechaInicio;
+      debugPrint('✅ Sincronizando con timestamp del servidor: $_serverStartedAt');
+    }
 
     // IMPORTANTE: El cronómetro SOLO se inicia si competencia.enCurso == true
     // enCurso corresponde al campo isRunning del servidor (NO isActive)
@@ -251,25 +271,47 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   Completado: $_isCompleted');
     debugPrint('   Competencia actual: $_competenciaActual');
 
-    // Iniciar cronómetro automáticamente
+    // Extraer timestamp del servidor
+    final startedAtStr = data?['started_at'] as String?;
+    if (startedAtStr != null) {
+      try {
+        _serverStartedAt = DateTime.parse(startedAtStr);
+        debugPrint('✅ Timestamp del servidor recibido: $_serverStartedAt');
+      } catch (e) {
+        debugPrint('⚠️ Error al parsear started_at: $e');
+      }
+    }
+
+    // RESETEAR estado completado para permitir reiniciar
+    if (_isCompleted) {
+      debugPrint('🔄 Reseteando estado completado para permitir inicio');
+      _isCompleted = false;
+      _registros.clear();
+    }
+
+    // Actualizar estado de competencia SIEMPRE (antes de verificar cronómetro)
+    if (_competenciaActual != null) {
+      _competenciaActual = _competenciaActual!.copyWith(
+        enCurso: true,
+        fechaInicio: _serverStartedAt ?? DateTime.now(),
+      );
+      debugPrint('✅ Estado de competencia actualizado: EN CURSO');
+    } else {
+      debugPrint('⚠️ No hay competencia actual cargada');
+    }
+
+    // Iniciar cronómetro automáticamente solo si NO está corriendo
     if (!_stopwatch.isRunning && !_isCompleted) {
       debugPrint('✅ INICIANDO CRONÓMETRO AUTOMÁTICAMENTE');
       start();
-
-      // Actualizar estado de competencia
-      if (_competenciaActual != null) {
-        _competenciaActual = _competenciaActual!.copyWith(
-          enCurso: true,
-          fechaInicio: DateTime.now(),
-        );
-        debugPrint('✅ Estado de competencia actualizado: EN CURSO');
-        notifyListeners();
-      } else {
-        debugPrint('⚠️ No hay competencia actual cargada');
-      }
     } else {
-      debugPrint('⚠️ No se inició cronómetro - Ya está corriendo: ${_stopwatch.isRunning}, Completado: $_isCompleted');
+      debugPrint('⚠️ Cronómetro ya está corriendo o completado');
     }
+    
+    // SIEMPRE notificar para disparar listeners (incluso si ya estaba corriendo)
+    debugPrint('📢 Llamando notifyListeners() para propagar cambio...');
+    notifyListeners();
+    debugPrint('✅ notifyListeners() ejecutado');
   }
 
   /// Maneja el evento de carrera detenida
@@ -278,23 +320,40 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('Datos recibidos: $data');
     debugPrint('Cronómetro corriendo: ${_stopwatch.isRunning}');
 
-    // Pausar cronómetro
+    // Extraer timestamp del servidor
+    final finishedAtStr = data?['finished_at'] as String?;
+    if (finishedAtStr != null) {
+      try {
+        _serverFinishedAt = DateTime.parse(finishedAtStr);
+        debugPrint('✅ Timestamp de finalización del servidor recibido: $_serverFinishedAt');
+      } catch (e) {
+        debugPrint('⚠️ Error al parsear finished_at: $e');
+      }
+    }
+
+    // Actualizar estado de competencia SIEMPRE (antes de verificar cronómetro)
+    if (_competenciaActual != null) {
+      _competenciaActual = _competenciaActual!.copyWith(
+        enCurso: false,
+        fechaFin: _serverFinishedAt ?? DateTime.now(),
+      );
+      debugPrint('✅ Estado de competencia actualizado: DETENIDA');
+    } else {
+      debugPrint('⚠️ No hay competencia actual cargada');
+    }
+
+    // Pausar cronómetro solo si está corriendo
     if (_stopwatch.isRunning) {
       debugPrint('⏸️ PAUSANDO CRONÓMETRO AUTOMÁTICAMENTE');
       pause();
-
-      // Actualizar estado de competencia
-      if (_competenciaActual != null) {
-        _competenciaActual = _competenciaActual!.copyWith(
-          enCurso: false,
-          fechaFin: DateTime.now(),
-        );
-        debugPrint('✅ Estado de competencia actualizado: DETENIDA');
-        notifyListeners();
-      }
     } else {
-      debugPrint('⚠️ No se pausó cronómetro - Ya está detenido');
+      debugPrint('⚠️ Cronómetro ya estaba pausado');
     }
+    
+    // SIEMPRE notificar para disparar listeners
+    debugPrint('📢 Llamando notifyListeners() para propagar cambio...');
+    notifyListeners();
+    debugPrint('✅ notifyListeners() ejecutado');
   }
 
   /// Maneja la actualización de competencia
@@ -505,7 +564,8 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   - registros actuales: ${_registros.length}');
 
     if (puedeMarcarTiempo && _equipoActual != null) {
-      final tiempo = _stopwatch.elapsedMilliseconds;
+      // Usar el getter que calcula desde el timestamp del servidor
+      final tiempo = elapsedMilliseconds;
       final registro = RegistroTiempo.fromTiempoTotal(
         idRegistro: const Uuid().v4(),
         equipoId: _equipoActual!.id,

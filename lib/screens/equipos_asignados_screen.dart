@@ -20,8 +20,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   List<Equipo> equiposAsignados = [];
   Competencia? competencia;
   bool isLoading = true;
+  bool _isInitialLoad = true; // Para evitar notificaciones en carga inicial
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  TimerProvider? _timerProvider; // Referencia al provider
 
   @override
   void initState() {
@@ -34,13 +36,197 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       begin: 0,
       end: 1,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    
+    // Registrar listener después de que el frame se construya
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _escucharEventosWebSocket();
+    });
+    
     _cargarEquipos();
   }
 
   @override
   void dispose() {
+    // Remover listener del TimerProvider
+    if (_timerProvider != null) {
+      _timerProvider!.removeListener(_onTimerProviderChanged);
+      debugPrint('🔇 Listener removido del TimerProvider');
+    }
+    
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Escucha eventos del WebSocket para actualizar el estado de la competencia
+  void _escucharEventosWebSocket() {
+    _timerProvider = Provider.of<TimerProvider>(context, listen: false);
+    
+    debugPrint('🎧 Registrando listener para eventos de competencia');
+    debugPrint('   - TimerProvider: $_timerProvider');
+    
+    // Escuchar cambios en el TimerProvider
+    _timerProvider!.addListener(_onTimerProviderChanged);
+    
+    debugPrint('   ✅ Listener registrado exitosamente');
+  }
+
+  /// Callback cuando cambia el estado del TimerProvider
+  void _onTimerProviderChanged() {
+    debugPrint('📱 _onTimerProviderChanged() llamado');
+    
+    if (_timerProvider == null) {
+      debugPrint('   ⚠️ _timerProvider es null');
+      return;
+    }
+    
+    final competenciaActual = _timerProvider!.competenciaActual;
+    
+    debugPrint('   - competenciaActual: ${competenciaActual?.nombre}');
+    debugPrint('   - enCurso: ${competenciaActual?.enCurso}');
+    debugPrint('   - mounted: $mounted');
+    debugPrint('   - _isInitialLoad: $_isInitialLoad');
+    
+    if (competenciaActual != null && mounted) {
+      // Detectar si la competencia cambió de estado
+      final estadoAnterior = competencia?.enCurso;
+      final estadoActual = competenciaActual.enCurso;
+      
+      debugPrint('   - estadoAnterior: $estadoAnterior');
+      debugPrint('   - estadoActual: $estadoActual');
+      
+      // Solo mostrar notificación si NO es la carga inicial y el estado cambió
+      if (!_isInitialLoad && estadoAnterior != null && estadoAnterior != estadoActual) {
+        debugPrint('   ✅ CAMBIO DE ESTADO DETECTADO');
+        
+        if (estadoActual) {
+          // La competencia acaba de iniciar
+          debugPrint('   🟢 Mostrando notificación: INICIADA');
+          _mostrarNotificacionCompetenciaIniciada(competenciaActual);
+        } else {
+          // La competencia se detuvo
+          debugPrint('   🔴 Mostrando notificación: DETENIDA');
+          _mostrarNotificacionCompetenciaDetenida(competenciaActual);
+        }
+      } else {
+        debugPrint('   ⏭️ No se muestra notificación (carga inicial o sin cambio)');
+      }
+      
+      // Siempre actualizar el estado local
+      setState(() {
+        competencia = competenciaActual;
+        _isInitialLoad = false; // Marcar que ya pasó la carga inicial
+      });
+    }
+  }
+
+  /// Muestra notificación cuando la competencia inicia
+  void _mostrarNotificacionCompetenciaIniciada(Competencia comp) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.shade600,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.play_arrow,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '¡Competencia iniciada!',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    comp.nombre,
+                    style: const TextStyle(fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  /// Muestra notificación cuando la competencia se detiene
+  void _mostrarNotificacionCompetenciaDetenida(Competencia comp) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade600,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.pause,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Competencia detenida',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    comp.nombre,
+                    style: const TextStyle(fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade700,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
   }
 
   Future<void> _cargarEquipos() async {
@@ -586,29 +772,24 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         final estadoCompetencia = snapshot.data;
         final enCurso = estadoCompetencia?['enCurso'] ?? false;
         final activa = estadoCompetencia?['activa'] ?? false;
-        final competenciaDelEquipo = estadoCompetencia?['competencia'] as Competencia?;
         
-        // Determinar color y texto del badge de estado
+        // Determinar color y texto del badge de estado para la card de competencia
         Color estadoBgColor;
         Color estadoTextColor;
         String estadoTexto;
-        IconData estadoIcon;
         
         if (enCurso) {
           estadoBgColor = Colors.green.shade100;
           estadoTextColor = Colors.green.shade700;
           estadoTexto = 'En Curso';
-          estadoIcon = Icons.play_circle_filled;
         } else if (activa) {
           estadoBgColor = Colors.orange.shade100;
           estadoTextColor = Colors.orange.shade700;
           estadoTexto = 'Por Iniciar';
-          estadoIcon = Icons.schedule;
         } else {
           estadoBgColor = Colors.grey.shade200;
           estadoTextColor = Colors.grey.shade700;
           estadoTexto = 'Inactiva';
-          estadoIcon = Icons.pause_circle_filled;
         }
 
         return Container(
@@ -778,80 +959,47 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                   ),
                                   const SizedBox(height: 6),
                                   
-                                  // Badge de estado EN CURSO
+                                  // Badge simple de estado
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
+                                      horizontal: 8,
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: estadoBgColor,
-                                      borderRadius: BorderRadius.circular(8),
+                                      color: enCurso 
+                                          ? Colors.green.shade50 
+                                          : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: enCurso 
+                                            ? Colors.green.shade300 
+                                            : Colors.grey.shade300,
+                                        width: 1,
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          estadoIcon,
+                                          enCurso ? Icons.check_circle : Icons.lock,
                                           size: 12,
-                                          color: estadoTextColor,
+                                          color: enCurso 
+                                              ? Colors.green.shade700 
+                                              : Colors.grey.shade500,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          estadoTexto.toUpperCase(),
+                                          enCurso ? 'Disponible' : 'Bloqueado',
                                           style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: estadoTextColor,
-                                            letterSpacing: 0.5,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: enCurso 
+                                                ? Colors.green.shade700 
+                                                : Colors.grey.shade600,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  
-                                  // Nombre de la competencia
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.emoji_events,
-                                        size: 11,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          equipo.competenciaNombre,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  
-                                  // 15 participantes
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        FontAwesomeIcons.users,
-                                        size: 11,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '15 participantes',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
                                   ),
                                 ],
                               ),
