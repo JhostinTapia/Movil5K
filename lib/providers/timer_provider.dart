@@ -510,12 +510,18 @@ class TimerProvider extends ChangeNotifier {
 
     try {
       _registros.clear();
+      debugPrint('🔍 Consultando registros del equipo ${_equipoActual!.id} en BD...');
       final registrosGuardados = await _repository.getRegistrosByEquipo(
         _equipoActual!.id,
       );
+      debugPrint('   📊 Registros encontrados en BD: ${registrosGuardados.length}');
       _registros.addAll(registrosGuardados);
 
-      debugPrint('📋 Registros cargados desde BD: ${_registros.length}');
+      debugPrint('📋 Registros cargados en memoria: ${_registros.length}');
+      if (_registros.isNotEmpty) {
+        debugPrint('   - Primer registro: ${_registros.first.tiempoFormateado}');
+        debugPrint('   - Último registro: ${_registros.last.tiempoFormateado}');
+      }
 
       // Solo marcar como completado si los datos ya fueron enviados
       // NO por tener 15 registros

@@ -8,12 +8,14 @@ class TimeMarkCard extends StatelessWidget {
   final RegistroTiempo registro;
   final int posicion;
   final VoidCallback onDelete;
+  final bool mostrarBotonEliminar; // Nuevo parámetro
 
   const TimeMarkCard({
     super.key,
     required this.registro,
     required this.posicion,
     required this.onDelete,
+    this.mostrarBotonEliminar = true, // Por defecto true para compatibilidad
   });
 
   List<Color> _getPosicionGradient(int pos) {
@@ -196,8 +198,9 @@ class TimeMarkCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Botón eliminar
-                Container(
+                // Botón eliminar (solo si está permitido)
+                if (mostrarBotonEliminar)
+                  Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(

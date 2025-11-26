@@ -542,25 +542,37 @@ class _TimerScreenState extends State<TimerScreen> {
                 const SizedBox(height: 28),
 
                 // Botón de Aceptar
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF43A047),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                Consumer<TimerProvider>(
+                  builder: (btnContext, timerProvider, _) => SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(); // Cerrar modal
+                        // Redirigir a pantalla de resultados
+                        Navigator.of(context).pushReplacementNamed(
+                          '/resultados',
+                          arguments: {
+                            'equipo': timerProvider.equipoActual,
+                            'competencia': timerProvider.competenciaActual,
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF43A047),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Aceptar',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                      child: const Text(
+                        'Ver Resultados',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ),
@@ -1742,6 +1754,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                       return TimeMarkCard(
                                         registro: registro,
                                         posicion: index + 1,
+                                        mostrarBotonEliminar: !timerProvider.datosEnviados,
                                         onDelete: () =>
                                             timerProvider.eliminarRegistro(
                                               registro.idRegistro,

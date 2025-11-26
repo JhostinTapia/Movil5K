@@ -359,11 +359,24 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       
       if (!mounted) return;
       
-      Navigator.pushNamed(
-        context,
-        '/timer',
-        arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
-      );
+      // Verificar si el equipo ya tiene datos enviados
+      final yaEnviado = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
+      
+      if (yaEnviado) {
+        // Si ya envió datos, ir a pantalla de resultados
+        Navigator.pushNamed(
+          context,
+          '/resultados',
+          arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
+        );
+      } else {
+        // Si no ha enviado, ir a pantalla de registro de tiempos
+        Navigator.pushNamed(
+          context,
+          '/timer',
+          arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
