@@ -179,18 +179,19 @@ class TimeMarkCard extends StatelessWidget {
                             registro.penalizado
                                 ? Icons.gavel_rounded
                                 : Icons.schedule_rounded,
-                            size: 12,
+                            size: 13,
                             color: Colors.white.withOpacity(0.9),
                           ),
                           const SizedBox(width: 5),
                           Text(
                             registro.penalizado
-                                ? 'Tiempo Agregado'
-                                : dateFormat.format(registro.timestamp),
+                                ? 'Penalización Agregada'
+                                : 'Registrado a las ${dateFormat.format(registro.timestamp)}',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               color: Colors.white.withOpacity(0.9),
                               fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
