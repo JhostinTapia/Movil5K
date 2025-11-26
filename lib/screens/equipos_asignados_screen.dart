@@ -21,6 +21,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   Competencia? competencia;
   bool isLoading = true;
   bool _isInitialLoad = true; // Para evitar notificaciones en carga inicial
+  bool? _ultimoEstadoEnCurso; // Para detectar cambios reales
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   TimerProvider? _timerProvider; // Referencia al provider
@@ -72,31 +73,27 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
 
   /// Callback cuando cambia el estado del TimerProvider
   void _onTimerProviderChanged() {
-    debugPrint('📱 _onTimerProviderChanged() llamado');
-    
-    if (_timerProvider == null) {
-      debugPrint('   ⚠️ _timerProvider es null');
-      return;
-    }
+    if (_timerProvider == null || !mounted) return;
     
     final competenciaActual = _timerProvider!.competenciaActual;
+    if (competenciaActual == null) return;
     
-    debugPrint('   - competenciaActual: ${competenciaActual?.nombre}');
-    debugPrint('   - enCurso: ${competenciaActual?.enCurso}');
-    debugPrint('   - mounted: $mounted');
-    debugPrint('   - _isInitialLoad: $_isInitialLoad');
+    final estadoActual = competenciaActual.enCurso;
     
-    if (competenciaActual != null && mounted) {
-      // Detectar si la competencia cambió de estado
-      final estadoAnterior = competencia?.enCurso;
-      final estadoActual = competenciaActual.enCurso;
+    // Solo procesar si el estado realmente cambió
+    if (_ultimoEstadoEnCurso != estadoActual) {
+      debugPrint('📱 _onTimerProviderChanged() - CAMBIO DETECTADO');
+      debugPrint('   - competenciaActual: ${competenciaActual.nombre}');
+      debugPrint('   - Estado anterior: $_ultimoEstadoEnCurso');
+      debugPrint('   - Estado actual: $estadoActual');
       
-      debugPrint('   - estadoAnterior: $estadoAnterior');
-      debugPrint('   - estadoActual: $estadoActual');
+      // Guardar el nuevo estado
+      final estadoAnterior = _ultimoEstadoEnCurso;
+      _ultimoEstadoEnCurso = estadoActual;
       
-      // Solo mostrar notificación si NO es la carga inicial y el estado cambió
-      if (!_isInitialLoad && estadoAnterior != null && estadoAnterior != estadoActual) {
-        debugPrint('   ✅ CAMBIO DE ESTADO DETECTADO');
+      // Solo mostrar notificación si NO es la carga inicial y hubo cambio
+      if (!_isInitialLoad && estadoAnterior != null) {
+        debugPrint('   ✅ CAMBIO DE ESTADO CONFIRMADO');
         
         if (estadoActual) {
           // La competencia acaba de iniciar
@@ -108,13 +105,13 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
           _mostrarNotificacionCompetenciaDetenida(competenciaActual);
         }
       } else {
-        debugPrint('   ⏭️ No se muestra notificación (carga inicial o sin cambio)');
+        debugPrint('   ⏭️ No se muestra notificación (carga inicial)');
       }
       
       // Siempre actualizar el estado local
       setState(() {
         competencia = competenciaActual;
-        _isInitialLoad = false; // Marcar que ya pasó la carga inicial
+        _isInitialLoad = false;
       });
     }
   }
@@ -785,7 +782,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         } else if (activa) {
           estadoBgColor = Colors.orange.shade100;
           estadoTextColor = Colors.orange.shade700;
-          estadoTexto = 'Por Iniciar';
+          estadoTexto = 'Programada';
         } else {
           estadoBgColor = Colors.grey.shade200;
           estadoTextColor = Colors.grey.shade700;

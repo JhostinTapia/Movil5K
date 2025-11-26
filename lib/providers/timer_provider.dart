@@ -84,13 +84,13 @@ class TimerProvider extends ChangeNotifier {
     if (_competenciaActual == null) return 'SIN COMPETENCIA';
     if (_isCompleted) return 'COMPLETADO';
     if (_competenciaActual!.estaEnProgreso) return 'EN CURSO';
-    if (_competenciaActual!.estaPorComenzar) return 'POR INICIAR';
+    if (_competenciaActual!.estaPorComenzar) return 'PROGRAMADA';
     return 'INACTIVA';
   }
 
-  // Verifica si puede marcar tiempo (competencia debe estar en curso)
+  // Verifica si puede marcar tiempo (competencia debe estar en curso y datos NO enviados)
   bool get puedeMarcarTiempo {
-    return _stopwatch.isRunning && canAddMore;
+    return _stopwatch.isRunning && canAddMore && !_datosEnviados;
   }
 
   // Obtiene el tiempo restante hasta el inicio de la competencia
@@ -139,12 +139,16 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   - Registros cargados desde BD: ${_registros.length}');
     debugPrint('   - Datos enviados previamente: $_datosEnviados');
 
-    // Si ya tiene 15 registros, marcar como completado
-    if (_registros.length >= maxParticipantes) {
+    // Solo marcar como completado si los datos fueron enviados
+    // NO por tener 15 registros
+    if (_datosEnviados) {
       _isCompleted = true;
+      debugPrint('   ✅ Equipo marcado como completado (datos ya enviados)');
+    } else if (_registros.length >= maxParticipantes) {
       debugPrint(
-        '   ⚠️ Ya hay ${_registros.length} registros guardados (máx: $maxParticipantes)',
+        '   ℹ️ Ya hay ${_registros.length} registros (máx: $maxParticipantes), pero aún no se han enviado',
       );
+      _isCompleted = false; // Permitir continuar hasta que se envíen
     } else {
       _isCompleted = false;
     }
@@ -513,19 +517,26 @@ class TimerProvider extends ChangeNotifier {
 
       debugPrint('📋 Registros cargados desde BD: ${_registros.length}');
 
-      if (_registros.length >= maxParticipantes) {
-        debugPrint(
-          '   ⚠️ Ya hay ${_registros.length} registros (máx: $maxParticipantes)',
-        );
-        debugPrint('   ✅ Competencia completada para este equipo');
+      // Solo marcar como completado si los datos ya fueron enviados
+      // NO por tener 15 registros
+      if (_datosEnviados) {
         _isCompleted = true;
-
+        debugPrint('   ✅ Competencia completada para este equipo (datos enviados)');
+        
         // Si ya completó, detener el cronómetro si está corriendo
         if (_stopwatch.isRunning) {
           _stopwatch.stop();
           _timer?.cancel();
-          debugPrint('   ⏸️ Cronómetro detenido (ya completado)');
+          debugPrint('   ⏸️ Cronómetro detenido (datos ya enviados)');
         }
+      } else if (_registros.length >= maxParticipantes) {
+        debugPrint(
+          '   ℹ️ Ya hay ${_registros.length} registros (máx: $maxParticipantes)',
+        );
+        debugPrint(
+          '   ⏭️ Registros pendientes de enviar - cronómetro continúa',
+        );
+        _isCompleted = false; // NO completado hasta que se envíen
       } else {
         _isCompleted = false;
         debugPrint(
@@ -538,7 +549,6 @@ class TimerProvider extends ChangeNotifier {
       debugPrint('Error cargando registros: $e');
     }
   }
-
   /// Actualiza el estado de sincronización
   Future<void> _updateSyncStatus() async {
     if (_equipoActual == null) return;
@@ -593,20 +603,15 @@ class TimerProvider extends ChangeNotifier {
         debugPrint('   ⚠️ Error guardando en BD local: $e');
       }
 
-      // Si llegamos al máximo de participantes, completar
+      // Ya NO detenemos el cronómetro al alcanzar el máximo
+      // Solo se detendrá cuando se envíen los datos
       if (_registros.length >= maxParticipantes) {
         debugPrint(
           '   🎯 Máximo de participantes alcanzado (${_registros.length}/$maxParticipantes)',
         );
-        _stopwatch.stop();
-        _timer?.cancel();
-        _isCompleted = true;
-
         debugPrint(
-          '   ⏸️ Cronómetro detenido. Presiona "Enviar Data" para sincronizar.',
+          '   ℹ️ Cronómetro sigue corriendo. Presiona "Enviar Data" para finalizar.',
         );
-
-        notifyListeners();
       }
 
       notifyListeners();
@@ -713,11 +718,26 @@ class TimerProvider extends ChangeNotifier {
       return {'success': false, 'message': 'No hay equipo seleccionado'};
     }
 
-    // Verificar nuevamente si el equipo ya tiene datos sincronizados
+    // Verificar PRIMERO si ya se enviaron los datos en esta sesión
+    if (_datosEnviados) {
+      debugPrint('⚠️ Los datos ya fueron enviados en esta sesión');
+      return {
+        'success': false, 
+        'message': 'Los datos de este equipo ya fueron enviados al servidor', 
+        'yaEnviado': true
+      };
+    }
+
+    // Verificar en BD si el equipo ya tiene datos sincronizados
     final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(_equipoActual!.id);
-    if (yaEnviado || _datosEnviados) {
-      debugPrint('⚠️ Los datos ya fueron enviados anteriormente');
-      return {'success': false, 'message': 'Los datos de este equipo ya fueron enviados al servidor', 'yaEnviado': true};
+    if (yaEnviado) {
+      debugPrint('⚠️ Los datos ya fueron enviados anteriormente (verificado en BD)');
+      _datosEnviados = true; // Actualizar flag local
+      return {
+        'success': false, 
+        'message': 'Los datos de este equipo ya fueron enviados al servidor', 
+        'yaEnviado': true
+      };
     }
 
     if (_isSyncing) {
@@ -858,6 +878,15 @@ class TimerProvider extends ChangeNotifier {
         
         // Marcar que los datos fueron enviados exitosamente
         _datosEnviados = true;
+        
+        // AHORA SÍ detener el cronómetro y marcar como completado
+        if (_stopwatch.isRunning) {
+          _stopwatch.stop();
+          _timer?.cancel();
+          debugPrint('⏸️ Cronómetro detenido tras envío exitoso');
+        }
+        _isCompleted = true;
+        debugPrint('✅ Proceso completado - datos enviados y cronómetro detenido');
       }
 
       _isSyncing = false;

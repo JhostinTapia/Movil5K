@@ -1393,69 +1393,70 @@ class _TimerScreenState extends State<TimerScreen> {
                     ),
                   ),
 
-                  // Cronómetro e indicador de estado
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Indicador de estado de la competencia
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                  // Cronómetro e indicador de estado (ocultar si datos ya fueron enviados)
+                  if (!timerProvider.datosEnviados)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _getEstadoColors(timerProvider),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Indicador de estado de la competencia
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _getEstadoColors(
-                                  timerProvider,
-                                )[0].withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: _getEstadoColors(timerProvider),
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _getEstadoIcon(timerProvider),
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                timerProvider.estadoCompetencia,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  letterSpacing: 0.5,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _getEstadoColors(
+                                    timerProvider,
+                                  )[0].withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getEstadoIcon(timerProvider),
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  timerProvider.estadoCompetencia,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Cronómetro
-                        Text(
-                          timerProvider.tiempoFormateado,
+                          const SizedBox(height: 16),
+                          // Cronómetro
+                          Text(
+                            timerProvider.tiempoFormateado,
                           style: TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.bold,
@@ -1485,69 +1486,71 @@ class _TimerScreenState extends State<TimerScreen> {
                                   ),
                           ),
                         ),
-                        // Botón de envío cuando se completa
-                        if (timerProvider.isCompleted)
-                          const SizedBox(height: 20),
-                        if (timerProvider.isCompleted)
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              gradient: timerProvider.datosEnviados
-                                  ? const LinearGradient(
-                                      colors: [Colors.grey, Colors.grey],
-                                    )
-                                  : const LinearGradient(
-                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                                    ),
-                              borderRadius: BorderRadius.circular(15),
-                              boxShadow: [
-                                if (!timerProvider.datosEnviados)
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF667eea,
-                                    ).withOpacity(0.4),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 5),
-                                  ),
-                              ],
-                            ),
-                            child: ElevatedButton.icon(
-                              onPressed: timerProvider.datosEnviados
-                                  ? null
-                                  : () => _mostrarConfirmacionEnvio(context),
-                              icon: Icon(
-                                timerProvider.datosEnviados
-                                    ? Icons.check_circle
-                                    : Icons.cloud_upload,
-                                size: 20,
-                              ),
-                              label: Text(
-                                timerProvider.datosEnviados
-                                    ? 'Datos Ya Enviados'
-                                    : 'Enviar Data Recolectada',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.white,
-                                disabledForegroundColor: Colors.white70,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
+                  
+                  // Botón de envío cuando hay 15 registros o está completado
+                  if (timerProvider.participantesRegistrados >= 15 || timerProvider.isCompleted)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: timerProvider.datosEnviados
+                              ? const LinearGradient(
+                                  colors: [Colors.grey, Colors.grey],
+                                )
+                              : const LinearGradient(
+                                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                ),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            if (!timerProvider.datosEnviados)
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF667eea,
+                                ).withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 5),
+                              ),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: timerProvider.datosEnviados
+                              ? null
+                              : () => _mostrarConfirmacionEnvio(context),
+                          icon: Icon(
+                            timerProvider.datosEnviados
+                                ? Icons.check_circle
+                                : Icons.cloud_upload,
+                            size: 20,
+                          ),
+                          label: Text(
+                            timerProvider.datosEnviados
+                                ? 'Datos Ya Enviados'
+                                : 'Enviar Data Recolectada',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            disabledForegroundColor: Colors.white70,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   const SizedBox(height: 12),
 

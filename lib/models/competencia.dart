@@ -80,7 +80,7 @@ class Competencia {
   String get estadoActual {
     if (fechaFin != null) return 'FINALIZADA';
     if (estaEnProgreso) return 'EN CURSO';
-    if (estaPorComenzar) return 'POR INICIAR';
+    if (estaPorComenzar) return 'PROGRAMADA';
     return 'INACTIVA';
   }
 
