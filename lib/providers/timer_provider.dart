@@ -19,6 +19,7 @@ class TimerProvider extends ChangeNotifier {
   Competencia? _competenciaActual;
   bool _isCompleted = false;
   bool _isSyncing = false;
+  bool _datosEnviados = false;
   int _registrosPendientes = 0;
   StreamSubscription? _webSocketSubscription;
   int _tiempoInicioOffset =
@@ -53,6 +54,7 @@ class TimerProvider extends ChangeNotifier {
   bool get canAddMore => _registros.length < maxParticipantes;
   bool get hasPendingSync => _registrosPendientes > 0;
   bool get isWebSocketConnected => _repository.isWebSocketConnected;
+  bool get datosEnviados => _datosEnviados;
 
   // Getters individuales para componentes de tiempo
   int get horas => elapsedMilliseconds ~/ 3600000;
@@ -110,10 +112,19 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('👥 Estableciendo equipo: ${equipo.nombre} (ID: ${equipo.id})');
     _equipoActual = equipo;
 
+    // Verificar si el equipo ya tiene registros sincronizados
+    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
+    _datosEnviados = yaEnviado;
+    
+    if (yaEnviado) {
+      debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados previamente');
+    }
+
     // Cargar registros desde BD local para continuar donde se quedó
     await reloadRegistros();
 
     debugPrint('   - Registros cargados desde BD: ${_registros.length}');
+    debugPrint('   - Datos enviados previamente: $_datosEnviados');
 
     // Si ya tiene 15 registros, marcar como completado
     if (_registros.length >= maxParticipantes) {
@@ -130,17 +141,26 @@ class TimerProvider extends ChangeNotifier {
 
   /// Establece la competencia actual y configura el monitoreo
   Future<void> setCompetencia(Competencia competencia) async {
+    debugPrint('🏁 ESTABLECIENDO COMPETENCIA:');
+    debugPrint('   - ID: ${competencia.id}');
+    debugPrint('   - Nombre: ${competencia.nombre}');
+    debugPrint('   - En curso: ${competencia.enCurso}');
+    debugPrint('   - Activa: ${competencia.activa}');
+    
     _competenciaActual = competencia;
 
-    // El cronómetro SOLO se inicia cuando la competencia está marcada como "en curso"
-    // La hora de inicio es solo referencial
+    // IMPORTANTE: El cronómetro SOLO se inicia si competencia.enCurso == true
+    // enCurso corresponde al campo isRunning del servidor (NO isActive)
+    // - isActive (activa): indica si la competencia existe (borrado lógico)
+    // - isRunning (enCurso): indica si la competencia está en curso
     if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
       debugPrint(
-        '🚀 La competencia está EN CURSO (activa) - Iniciando cronómetro',
+        '🚀 La competencia está EN CURSO (isRunning=true) - Iniciando cronómetro',
       );
       start();
     } else if (!competencia.enCurso) {
-      debugPrint('⏸️ La competencia NO está activa - Cronómetro en espera');
+      debugPrint('⏸️ La competencia NO está en curso (isRunning=false) - Cronómetro en espera');
+      debugPrint('   ⚠️ Esperando mensaje WebSocket de inicio...');
     }
 
     await _iniciarMonitoreoCompetencia();
@@ -150,6 +170,14 @@ class TimerProvider extends ChangeNotifier {
   /// Conecta al WebSocket para recibir notificaciones
   Future<void> connectWebSocket(int juezId) async {
     try {
+      debugPrint('🔌 CONECTANDO WEBSOCKET para juez $juezId');
+      if (_competenciaActual != null) {
+        debugPrint('   📊 Competencia cargada: ${_competenciaActual!.nombre} (ID: ${_competenciaActual!.id})');
+        debugPrint('   📊 En curso: ${_competenciaActual!.enCurso}');
+      } else {
+        debugPrint('   ⚠️ No hay competencia cargada aún');
+      }
+      
       await _repository.connectWebSocket(juezId);
 
       // Escuchar mensajes del WebSocket
@@ -158,71 +186,114 @@ class TimerProvider extends ChangeNotifier {
         onError: (error) => debugPrint('Error en WebSocket: $error'),
       );
 
-      debugPrint('WebSocket conectado para juez $juezId');
+      debugPrint('✅ WebSocket listener configurado para juez $juezId');
     } catch (e) {
-      debugPrint('Error conectando WebSocket: $e');
+      debugPrint('❌ Error conectando WebSocket: $e');
     }
   }
 
   /// Maneja los mensajes recibidos por WebSocket
   void _handleWebSocketMessage(dynamic message) {
-    debugPrint('Mensaje WebSocket: $message');
-
-    if (message is Map<String, dynamic>) {
-      final type = message['type'] as String?;
-      final data = message['data'] as Map<String, dynamic>?;
-
-      switch (type) {
-        case 'carrera.iniciada':
-          _handleCarreraIniciada(data);
-          break;
-        case 'carrera.detenida':
-          _handleCarreraDetenida(data);
-          break;
-        case 'competencia.actualizada':
-          _handleCompetenciaActualizada(data);
-          break;
-        default:
-          debugPrint('Tipo de mensaje desconocido: $type');
+    // El mensaje ya viene como WebSocketMessage desde el repository
+    if (message is WebSocketMessage) {
+      // Ignorar mensajes de pong (heartbeat)
+      if (message.type == WebSocketMessageType.pong) {
+        return;
       }
+      
+      debugPrint('📨 Mensaje WebSocket recibido en TimerProvider');
+      debugPrint('📨 Tipo: ${message.type}');
+      debugPrint('📨 Datos: ${message.data}');
+      
+      switch (message.type) {
+        case WebSocketMessageType.competenciaIniciada:
+        case WebSocketMessageType.carreraIniciada:
+          debugPrint('🏁 COMPETENCIA INICIADA - Iniciando cronómetro');
+          _handleCarreraIniciada(message.data);
+          break;
+          
+        case WebSocketMessageType.competenciaDetenida:
+        case WebSocketMessageType.carreraDetenida:
+          debugPrint('🛑 COMPETENCIA DETENIDA - Pausando cronómetro');
+          _handleCarreraDetenida(message.data);
+          break;
+          
+        case WebSocketMessageType.conexionEstablecida:
+          debugPrint('✅ Conexión WebSocket establecida');
+          // Si la competencia viene en curso, iniciar cronómetro
+          final competencia = message.data['competencia'] as Map<String, dynamic>?;
+          if (competencia != null) {
+            final enCurso = competencia['en_curso'] as bool?;
+            if (enCurso == true && !_stopwatch.isRunning) {
+              debugPrint('🏁 Competencia ya estaba en curso - Iniciando cronómetro');
+              _handleCarreraIniciada(competencia);
+            }
+          }
+          break;
+          
+        case WebSocketMessageType.pong:
+          // Ignorar pong - es solo respuesta al heartbeat
+          break;
+          
+        default:
+          debugPrint('Tipo de mensaje: ${message.type}');
+      }
+    } else {
+      debugPrint('⚠️ Mensaje no es WebSocketMessage: ${message.runtimeType}');
     }
   }
 
   /// Maneja el evento de carrera iniciada
   void _handleCarreraIniciada(Map<String, dynamic>? data) {
-    debugPrint('Carrera iniciada: $data');
+    debugPrint('🏁 PROCESANDO INICIO DE COMPETENCIA');
+    debugPrint('   Datos recibidos: $data');
+    debugPrint('   Cronómetro corriendo: ${_stopwatch.isRunning}');
+    debugPrint('   Completado: $_isCompleted');
+    debugPrint('   Competencia actual: $_competenciaActual');
 
     // Iniciar cronómetro automáticamente
     if (!_stopwatch.isRunning && !_isCompleted) {
+      debugPrint('✅ INICIANDO CRONÓMETRO AUTOMÁTICAMENTE');
       start();
 
       // Actualizar estado de competencia
-      if (_competenciaActual != null && data != null) {
+      if (_competenciaActual != null) {
         _competenciaActual = _competenciaActual!.copyWith(
           enCurso: true,
           fechaInicio: DateTime.now(),
         );
+        debugPrint('✅ Estado de competencia actualizado: EN CURSO');
         notifyListeners();
+      } else {
+        debugPrint('⚠️ No hay competencia actual cargada');
       }
+    } else {
+      debugPrint('⚠️ No se inició cronómetro - Ya está corriendo: ${_stopwatch.isRunning}, Completado: $_isCompleted');
     }
   }
 
   /// Maneja el evento de carrera detenida
   void _handleCarreraDetenida(Map<String, dynamic>? data) {
-    debugPrint('Carrera detenida: $data');
+    debugPrint('🛑 PROCESANDO DETENCIÓN DE COMPETENCIA');
+    debugPrint('Datos recibidos: $data');
+    debugPrint('Cronómetro corriendo: ${_stopwatch.isRunning}');
 
     // Pausar cronómetro
     if (_stopwatch.isRunning) {
+      debugPrint('⏸️ PAUSANDO CRONÓMETRO AUTOMÁTICAMENTE');
       pause();
 
       // Actualizar estado de competencia
-      if (_competenciaActual != null && data != null) {
+      if (_competenciaActual != null) {
         _competenciaActual = _competenciaActual!.copyWith(
           enCurso: false,
           fechaFin: DateTime.now(),
         );
+        debugPrint('✅ Estado de competencia actualizado: DETENIDA');
         notifyListeners();
       }
+    } else {
+      debugPrint('⚠️ No se pausó cronómetro - Ya está detenido');
     }
   }
 
@@ -267,30 +338,42 @@ class TimerProvider extends ChangeNotifier {
         // Notificar cambios para actualizar la UI del countdown
         notifyListeners();
 
-        // Refrescar competencia desde el servidor cada 10 segundos
+        // Refrescar competencia desde el servidor solo si WebSocket NO está conectado (fallback)
+        // Cada 10 segundos como respaldo
         if (timer.tick % 10 == 0) {
-          try {
-            final competencia = await _repository.getCompetencia(
-              _competenciaActual!.id,
-            );
-            final anteriorEnCurso = _competenciaActual!.enCurso;
-            _competenciaActual = competencia;
+          // Solo hacer polling si WebSocket está desconectado
+          final isWebSocketConnected = _repository.isWebSocketConnected;
+          
+          if (!isWebSocketConnected) {
+            debugPrint('Polling fallback: WebSocket desconectado, consultando API');
+            try {
+              final competencia = await _repository.getCompetencia(
+                _competenciaActual!.id,
+              );
+              final anteriorEnCurso = _competenciaActual!.enCurso;
+              _competenciaActual = competencia;
 
-            // Si la competencia está en curso y el cronómetro no está corriendo, iniciarlo
-            if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
-              if (!anteriorEnCurso) {
-                debugPrint(
-                  '🚀 Competencia cambió a EN CURSO - Iniciando cronómetro',
-                );
-              } else {
-                debugPrint(
-                  '🚀 Competencia está EN CURSO pero cronómetro detenido - Iniciando',
-                );
+              // Si la competencia está en curso y el cronómetro no está corriendo, iniciarlo
+              if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
+                if (!anteriorEnCurso) {
+                  debugPrint(
+                    'Competencia cambió a EN CURSO - Iniciando cronómetro',
+                  );
+                } else {
+                  debugPrint(
+                    'Competencia está EN CURSO pero cronómetro detenido - Iniciando',
+                  );
+                }
+                start();
               }
-              start();
+            } catch (e) {
+              debugPrint('Error refrescando competencia: $e');
             }
-          } catch (e) {
-            debugPrint('Error refrescando competencia: $e');
+          } else {
+            // WebSocket conectado, no hacer polling
+            if (timer.tick == 10) {
+              debugPrint('WebSocket activo: polling deshabilitado (usando actualizaciones en tiempo real)');
+            }
           }
         }
       }
@@ -563,15 +646,23 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('🚀 enviarRegistrosPorWebSocket() INICIADO');
     debugPrint('   - _isSyncing: $_isSyncing');
     debugPrint('   - _equipoActual: ${_equipoActual?.nombre}');
-
-    if (_isSyncing) {
-      debugPrint('⚠️ Envío ya en progreso');
-      return {'success': false, 'message': 'Envío en progreso'};
-    }
+    debugPrint('   - _datosEnviados: $_datosEnviados');
 
     if (_equipoActual == null) {
       debugPrint('⚠️ No hay equipo seleccionado');
       return {'success': false, 'message': 'No hay equipo seleccionado'};
+    }
+
+    // Verificar nuevamente si el equipo ya tiene datos sincronizados
+    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(_equipoActual!.id);
+    if (yaEnviado || _datosEnviados) {
+      debugPrint('⚠️ Los datos ya fueron enviados anteriormente');
+      return {'success': false, 'message': 'Los datos de este equipo ya fueron enviados al servidor', 'yaEnviado': true};
+    }
+
+    if (_isSyncing) {
+      debugPrint('⚠️ Envío ya en progreso');
+      return {'success': false, 'message': 'Envío en progreso'};
     }
 
     _isSyncing = true;
@@ -704,6 +795,9 @@ class TimerProvider extends ChangeNotifier {
           }
         }
         debugPrint('✅ Todos los registros marcados como sincronizados');
+        
+        // Marcar que los datos fueron enviados exitosamente
+        _datosEnviados = true;
       }
 
       _isSyncing = false;
@@ -771,6 +865,41 @@ class TimerProvider extends ChangeNotifier {
     _registros.clear();
     await _cargarRegistrosGuardados();
 
+    notifyListeners();
+  }
+  
+  /// Limpia completamente el estado (usado en logout)
+  void clearAll() {
+    debugPrint('🧹 TimerProvider: Limpiando todo el estado (logout)');
+    
+    // Detener cronómetro
+    if (_stopwatch.isRunning) {
+      _stopwatch.stop();
+    }
+    _stopwatch.reset();
+    
+    // Cancelar todos los timers
+    _timer?.cancel();
+    _timer = null;
+    _checkTimer?.cancel();
+    _checkTimer = null;
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = null;
+    
+    // Cancelar suscripción WebSocket
+    _webSocketSubscription?.cancel();
+    _webSocketSubscription = null;
+    
+    // Limpiar datos
+    _registros.clear();
+    _equipoActual = null;
+    _competenciaActual = null;
+    _isCompleted = false;
+    _isSyncing = false;
+    _registrosPendientes = 0;
+    _tiempoInicioOffset = 0;
+    _envioCompleter = null;
+    
     notifyListeners();
   }
 

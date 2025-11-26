@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:io';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../config/api_config.dart';
 
@@ -15,6 +16,7 @@ enum WebSocketMessageType {
   tiemposRegistradosBatch,
   equipoAsignado,
   sincronizacionCompletada,
+  pong,
   error,
   unknown,
 }
@@ -65,6 +67,8 @@ class WebSocketMessage {
         return WebSocketMessageType.equipoAsignado;
       case 'sincronizacion.completada':
         return WebSocketMessageType.sincronizacionCompletada;
+      case 'pong':
+        return WebSocketMessageType.pong;
       case 'error':
         return WebSocketMessageType.error;
       default:
@@ -78,7 +82,7 @@ enum WebSocketState { disconnected, connecting, connected, reconnecting, error }
 
 /// Servicio de WebSocket para comunicación en tiempo real
 class WebSocketService {
-  WebSocketChannel? _channel;
+  IOWebSocketChannel? _channel;
   StreamSubscription? _subscription;
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
@@ -99,7 +103,7 @@ class WebSocketService {
 
   WebSocketService({required int juezId, required String accessToken})
     : _juezId = juezId,
-      _accessToken = accessToken;
+      _accessToken = accessToken.trim().replaceAll(RegExp(r'[#\n\r\t\s]'), '');
 
   /// Stream de mensajes
   Stream<WebSocketMessage> get messages => _messageController.stream;
@@ -113,6 +117,28 @@ class WebSocketService {
   /// Está conectado
   bool get isConnected => _state == WebSocketState.connected;
 
+  /// Construir URI correctamente
+  Uri _buildWebSocketUri() {
+    // Limpiar token (ya está limpio desde el constructor, pero por seguridad)
+    final cleanToken = _accessToken.trim().replaceAll(RegExp(r'[#\n\r\t\s]'), '');
+    
+    // Construir URI usando el constructor Uri() para evitar problemas
+    final wsBaseUrl = ApiConfig.wsBaseUrl.replaceFirst('ws://', '');
+    final parts = wsBaseUrl.split(':');
+    final host = parts[0];
+    final port = parts.length > 1 ? int.parse(parts[1]) : 8000;
+    
+    return Uri(
+      scheme: 'ws',
+      host: host,
+      port: port,
+      path: '/ws/juez/$_juezId/',
+      queryParameters: {
+        'token': cleanToken,
+      },
+    );
+  }
+
   /// Conectar al WebSocket
   Future<void> connect() async {
     if (_state == WebSocketState.connected ||
@@ -123,8 +149,50 @@ class WebSocketService {
     try {
       _updateState(WebSocketState.connecting);
 
-      final wsUrl = ApiConfig.webSocketUrl(_juezId, _accessToken);
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      // Construir URI correctamente
+      final uri = _buildWebSocketUri();
+      
+      print('═══════════════════════════════════════');
+      print('🔌 CONECTANDO WEBSOCKET');
+      print('═══════════════════════════════════════');
+      print('Scheme: ${uri.scheme}');
+      print('Host: ${uri.host}');
+      print('Port: ${uri.port}');
+      print('Path: ${uri.path}');
+      print('Query: ${uri.query}');
+      print('Fragment: "${uri.fragment}" (debe estar vacío)');
+      print('URI completo: $uri');
+      print('═══════════════════════════════════════');
+      
+      // Verificaciones de seguridad
+      if (uri.scheme != 'ws') {
+        throw Exception('❌ Scheme incorrecto: ${uri.scheme} (debe ser ws)');
+      }
+      
+      if (uri.fragment.isNotEmpty) {
+        throw Exception('❌ URI tiene fragment (#): ${uri.fragment}');
+      }
+      
+      if (uri.query.contains('#')) {
+        throw Exception('❌ Query contiene #: ${uri.query}');
+      }
+      
+      // ✅ USAR WebSocket.connect directamente y envolver en IOWebSocketChannel
+      print('🔄 Conectando usando WebSocket.connect...');
+      final webSocket = await WebSocket.connect(
+        uri.toString(),
+        headers: {
+          'Connection': 'Upgrade',
+          'Upgrade': 'websocket',
+        },
+      ).timeout(
+        Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('⏱️ Timeout conectando al WebSocket');
+        },
+      );
+      
+      _channel = IOWebSocketChannel(webSocket);
 
       // Escuchar mensajes
       _subscription = _channel!.stream.listen(
@@ -140,9 +208,28 @@ class WebSocketService {
       // Iniciar heartbeat
       _startHeartbeat();
 
-      print('✅ WebSocket conectado (Juez: $_juezId)');
-    } catch (e) {
+      print('✅ WebSocket conectado exitosamente (Juez: $_juezId)');
+    } catch (e, stackTrace) {
       print('❌ Error conectando WebSocket: $e');
+      print('🔍 Detalles del error: ${e.runtimeType}');
+      
+      // Si es un WebSocketException, mostrar más detalles
+      if (e is WebSocketException) {
+        print('📋 WebSocketException - Mensaje: ${e.message}');
+        
+        // Verificar si es un error 403
+        if (e.message != null && e.message!.contains('403')) {
+          print('🚫 Error 403 Forbidden - El servidor Django rechazó la conexión');
+          print('   Posibles causas:');
+          print('   1. Token inválido o expirado');
+          print('   2. Token no enviado correctamente');
+          print('   3. Middleware de autenticación rechazando');
+          print('   4. CORS o configuración de ALLOWED_HOSTS');
+          print('💡 Revisa los logs del servidor Django para más información');
+        }
+      }
+      
+      print('📚 Stack trace: $stackTrace');
       _updateState(WebSocketState.error);
       _scheduleReconnect();
     }
@@ -172,7 +259,10 @@ class WebSocketService {
 
     try {
       final jsonMessage = json.encode(message);
-      print('📤 Enviando mensaje: $jsonMessage');
+      // Solo loguear mensajes importantes (no ping)
+      if (message['tipo'] != 'ping') {
+        print('📤 Enviando mensaje: $jsonMessage');
+      }
       _channel?.sink.add(jsonMessage);
     } catch (e) {
       print('❌ Error enviando mensaje: $e');
@@ -187,8 +277,11 @@ class WebSocketService {
 
       _messageController.add(message);
 
-      print('📨 Mensaje recibido: ${message.type}');
-      print('📨 Datos completos: $json');
+      // Solo loguear mensajes importantes (no pong)
+      if (message.type != WebSocketMessageType.pong) {
+        print('📨 Mensaje recibido: ${message.type}');
+        print('📨 Datos completos: $json');
+      }
     } catch (e) {
       print('❌ Error procesando mensaje: $e');
     }
@@ -197,6 +290,36 @@ class WebSocketService {
   /// Maneja errores
   void _handleError(error) {
     print('❌ Error en WebSocket: $error');
+    print('🔍 Tipo de error: ${error.runtimeType}');
+    
+    // Parsear mensaje de error del servidor para mostrar al usuario
+    String errorMessage = 'Error de conexión con el servidor';
+    
+    final errorStr = error.toString().toLowerCase();
+    
+    // Detectar errores específicos
+    if (errorStr.contains('no tienes equipos asignados')) {
+      errorMessage = 'No tienes equipos asignados. Contacta al administrador.';
+    } else if (errorStr.contains('no tienes competencias activas') || 
+               errorStr.contains('competencia no está activa')) {
+      errorMessage = 'Tu competencia no está activa. Contacta al administrador.';
+    } else if (errorStr.contains('not upgraded to websocket')) {
+      errorMessage = 'Error de autenticación. Intenta cerrar sesión y volver a entrar.';
+    } else if (errorStr.contains('token inválido') || errorStr.contains('token invalido')) {
+      errorMessage = 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.';
+    } else if (errorStr.contains('connection refused') || errorStr.contains('failed to connect')) {
+      errorMessage = 'No se puede conectar al servidor. Verifica tu conexión a internet.';
+    }
+    
+    // Emitir mensaje de error para que la UI lo capture
+    _messageController.add(WebSocketMessage(
+      type: WebSocketMessageType.error,
+      data: {
+        'mensaje': errorMessage,
+        'error_tecnico': error.toString(),
+      },
+    ));
+    
     _updateState(WebSocketState.error);
     _scheduleReconnect();
   }
@@ -230,7 +353,8 @@ class WebSocketService {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (timer) {
       if (isConnected) {
-        send({'tipo': 'ping', 'timestamp': DateTime.now().toIso8601String()});
+        send({'tipo': 'ping'});
+        print('Heartbeat enviado');
       }
     });
   }

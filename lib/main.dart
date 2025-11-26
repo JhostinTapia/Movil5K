@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'dart:io' show Platform;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_provider.dart';
@@ -10,6 +12,12 @@ import 'screens/equipos_asignados_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar sqflite_ffi para Windows, Linux y macOS
+  if (Platform.isWindows || Platform.isLinux) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
 
   // Configurar orientación portrait
   SystemChrome.setPreferredOrientations([

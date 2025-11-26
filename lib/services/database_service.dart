@@ -154,6 +154,17 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  // Verificar si el equipo ya tiene registros sincronizados
+  Future<bool> equipoTieneRegistrosSincronizados(int equipoId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM registros_tiempo WHERE equipo_id = ? AND sincronizado = 1',
+      [equipoId],
+    );
+    final count = Sqflite.firstIntValue(result) ?? 0;
+    return count > 0;
+  }
+
   // Obtener todos los registros con información del equipo
   Future<List<Map<String, dynamic>>> obtenerTodosLosRegistros() async {
     final db = await database;

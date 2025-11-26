@@ -16,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen>
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _categoriaSeleccionada = 'estudiantes';
   bool _obscurePassword = true;
 
   late AnimationController _controller;
@@ -253,59 +252,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildCategoriaField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _categoriaSeleccionada,
-          isExpanded: true,
-          icon: Icon(Icons.arrow_drop_down, color: Colors.grey.shade400),
-          style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-          items: const [
-            DropdownMenuItem(
-              value: 'estudiantes',
-              child: Row(
-                children: [
-                  Icon(
-                    FontAwesomeIcons.graduationCap,
-                    size: 18,
-                    color: AppTheme.primaryColor,
-                  ),
-                  SizedBox(width: 12),
-                  Text('Estudiantes por Equipos'),
-                ],
-              ),
-            ),
-            DropdownMenuItem(
-              value: 'interfacultades',
-              child: Row(
-                children: [
-                  Icon(
-                    FontAwesomeIcons.building,
-                    size: 18,
-                    color: AppTheme.primaryColor,
-                  ),
-                  SizedBox(width: 12),
-                  Text('Interfacultades por Equipos'),
-                ],
-              ),
-            ),
-          ],
-          onChanged: (value) {
-            setState(() {
-              _categoriaSeleccionada = value!;
-            });
-          },
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildLoginButton(bool isLoading) {
     return AnimatedContainer(
@@ -521,10 +468,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                                   // Campo contraseña
                                   _buildPasswordField(),
-                                  const SizedBox(height: 20),
-
-                                  // Campo categoría
-                                  _buildCategoriaField(),
                                   const SizedBox(height: 25),
 
                                   // Botón de login

@@ -22,16 +22,16 @@ class Competencia {
   factory Competencia.fromJson(Map<String, dynamic> json) {
     return Competencia(
       id: json['id'],
-      nombre: json['nombre'],
-      fechaHora: DateTime.parse(json['fecha_hora']),
-      categoria: json['categoria'],
-      activa: json['activa'] ?? true,
-      enCurso: json['en_curso'] ?? false,
-      fechaInicio: json['fecha_inicio'] != null
-          ? DateTime.parse(json['fecha_inicio'])
+      nombre: json['name'],
+      fechaHora: DateTime.parse(json['datetime']),
+      categoria: json['category'],
+      activa: json['is_active'] ?? true,
+      enCurso: json['is_running'] ?? false,
+      fechaInicio: json['started_at'] != null
+          ? DateTime.parse(json['started_at'])
           : null,
-      fechaFin: json['fecha_fin'] != null
-          ? DateTime.parse(json['fecha_fin'])
+      fechaFin: json['finished_at'] != null
+          ? DateTime.parse(json['finished_at'])
           : null,
     );
   }
@@ -39,13 +39,13 @@ class Competencia {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'nombre': nombre,
-      'fecha_hora': fechaHora.toIso8601String(),
-      'categoria': categoria,
-      'activa': activa,
-      'en_curso': enCurso,
-      'fecha_inicio': fechaInicio?.toIso8601String(),
-      'fecha_fin': fechaFin?.toIso8601String(),
+      'name': nombre,
+      'datetime': fechaHora.toIso8601String(),
+      'category': categoria,
+      'is_active': activa,
+      'is_running': enCurso,
+      'started_at': fechaInicio?.toIso8601String(),
+      'finished_at': fechaFin?.toIso8601String(),
     };
   }
 

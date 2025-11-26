@@ -44,6 +44,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   }
 
   Future<void> _cargarEquipos() async {
+    setState(() {
+      isLoading = true;
+    });
+    
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final timerProvider = Provider.of<TimerProvider>(context, listen: false);
@@ -51,18 +55,30 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       // Cargar competencias desde la API
       final competencias = await authProvider.repository.getCompetencias();
       if (competencias.isNotEmpty) {
-        competencia = competencias.first;
-        // Configurar la competencia en el TimerProvider para monitoreo
+        // Obtener la competencia activa y en curso (para el banner y monitoreo general)
+        competencia = competencias.firstWhere(
+          (c) => c.activa && c.enCurso,
+          orElse: () => competencias.firstWhere(
+            (c) => c.activa,
+            orElse: () => competencias.first,
+          ),
+        );
+        // Configurar la competencia principal en el TimerProvider para monitoreo
         await timerProvider.setCompetencia(competencia!);
       }
 
-      // Cargar equipos asignados desde la API
-      final equiposFiltrados = await authProvider.repository.getEquipos();
+      // Cargar TODOS los equipos asignados al juez (sin filtrar)
+      final todosLosEquipos = await authProvider.repository.getEquipos();
 
       setState(() {
-        equiposAsignados = equiposFiltrados;
+        equiposAsignados = todosLosEquipos; // Todos los equipos, sin filtrar
         isLoading = false;
       });
+
+      // Mostrar advertencia si no hay equipos asignados
+      if (todosLosEquipos.isEmpty && mounted) {
+        _mostrarAdvertenciaNoEquipos();
+      }
 
       _controller.forward();
     } catch (e) {
@@ -72,20 +88,188 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al cargar equipos: $e'),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Error al cargar equipos: $e')),
+              ],
+            ),
             backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              textColor: Colors.white,
+              onPressed: _cargarEquipos,
+            ),
           ),
         );
       }
     }
   }
-
-  void _seleccionarEquipo(Equipo equipo) {
-    Navigator.pushNamed(
-      context,
-      '/timer',
-      arguments: {'equipo': equipo, 'competencia': competencia},
+  
+  void _mostrarAdvertenciaNoEquipos() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Sin Equipos Asignados',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'No tienes equipos asignados en este momento.',
+              style: TextStyle(fontSize: 15, height: 1.5),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Por favor, contacta al administrador para que te asigne un equipo y puedas comenzar a registrar tiempos.',
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<void> _seleccionarEquipo(Equipo equipo, bool enCurso) async {
+    // Si la competencia no está en curso, mostrar mensaje
+    if (!enCurso) {
+      if (!mounted) return;
+      _mostrarCompetenciaNoIniciada();
+      return;
+    }
+
+    // Buscar la competencia específica del equipo
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final competencias = await authProvider.repository.getCompetencias();
+      final competenciaDelEquipo = competencias.firstWhere(
+        (c) => c.id == equipo.competenciaId,
+        orElse: () => competencia!,
+      );
+      
+      if (!mounted) return;
+      
+      Navigator.pushNamed(
+        context,
+        '/timer',
+        arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar competencia: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  void _mostrarCompetenciaNoIniciada() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.schedule, color: Colors.orange.shade700, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Competencia no iniciada',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Esta competencia aún no ha comenzado.',
+              style: TextStyle(fontSize: 15, height: 1.5),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Solo puedes registrar tiempos de equipos cuya competencia esté en curso.',
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Retorna un mapa con el estado de la competencia de un equipo
+  Future<Map<String, dynamic>> _obtenerEstadoCompetencia(Equipo equipo) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final competencias = await authProvider.repository.getCompetencias();
+      final competenciaDelEquipo = competencias.firstWhere(
+        (c) => c.id == equipo.competenciaId,
+        orElse: () => Competencia(
+          id: 0,
+          nombre: 'Desconocida',
+          fechaHora: DateTime.now(),
+          categoria: 'estudiantes',
+          activa: false,
+          enCurso: false,
+        ),
+      );
+      
+      return {
+        'competencia': competenciaDelEquipo,
+        'enCurso': competenciaDelEquipo.enCurso,
+        'activa': competenciaDelEquipo.activa,
+      };
+    } catch (e) {
+      return {
+        'competencia': null,
+        'enCurso': false,
+        'activa': false,
+      };
+    }
   }
 
   @override
@@ -144,6 +328,11 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 size: 24,
                               ),
                               onPressed: () {
+                                // Limpiar estado del timer antes de cerrar sesión
+                                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+                                timerProvider.clearAll();
+                                
+                                // Cerrar sesión
                                 authProvider.logout();
                                 Navigator.pushReplacementNamed(
                                   context,
@@ -288,20 +477,27 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                   // Banner de cuenta regresiva
                   const CountdownBanner(),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   // Lista de equipos
                   Expanded(
-                    child: isLoading
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF667eea),
+                    child: RefreshIndicator(
+                      onRefresh: _cargarEquipos,
+                      color: const Color(0xFF667eea),
+                      child: isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF667eea),
+                                ),
                               ),
-                            ),
-                          )
-                        : equiposAsignados.isEmpty
-                        ? Center(
+                            )
+                          : equiposAsignados.isEmpty
+                          ? SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.5,
+                                child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -337,7 +533,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Contacta al administrador\npara asignarte equipos',
+                                  'Arrastra hacia abajo para actualizar',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 13,
@@ -346,20 +542,24 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 ),
                               ],
                             ),
-                          )
-                        : FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
                               ),
-                              itemCount: equiposAsignados.length,
-                              itemBuilder: (context, index) {
-                                final equipo = equiposAsignados[index];
-                                return _buildEquipoCard(equipo, index);
-                              },
                             ),
-                          ),
+                          )
+                          : FadeTransition(
+                              opacity: _fadeAnimation,
+                              child: ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                ),
+                                itemCount: equiposAsignados.length,
+                                itemBuilder: (context, index) {
+                                  final equipo = equiposAsignados[index];
+                                  return _buildEquipoCard(equipo, index);
+                                },
+                              ),
+                            ),
+                    ),
                   ),
                 ],
               ),
@@ -380,130 +580,307 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
 
     final gradient = gradientColors[index % gradientColors.length];
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: gradient[0].withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => _seleccionarEquipo(equipo),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: gradient[0].withOpacity(0.3), width: 2),
-            ),
-            child: Row(
-              children: [
-                // Badge del dorsal con gradiente
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradient[0].withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'DORSAL',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '#${equipo.dorsal}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _obtenerEstadoCompetencia(equipo),
+      builder: (context, snapshot) {
+        final estadoCompetencia = snapshot.data;
+        final enCurso = estadoCompetencia?['enCurso'] ?? false;
+        final activa = estadoCompetencia?['activa'] ?? false;
+        final competenciaDelEquipo = estadoCompetencia?['competencia'] as Competencia?;
+        
+        // Determinar color y texto del badge de estado
+        Color estadoBgColor;
+        Color estadoTextColor;
+        String estadoTexto;
+        IconData estadoIcon;
+        
+        if (enCurso) {
+          estadoBgColor = Colors.green.shade100;
+          estadoTextColor = Colors.green.shade700;
+          estadoTexto = 'En Curso';
+          estadoIcon = Icons.play_circle_filled;
+        } else if (activa) {
+          estadoBgColor = Colors.orange.shade100;
+          estadoTextColor = Colors.orange.shade700;
+          estadoTexto = 'Por Iniciar';
+          estadoIcon = Icons.schedule;
+        } else {
+          estadoBgColor = Colors.grey.shade200;
+          estadoTextColor = Colors.grey.shade700;
+          estadoTexto = 'Inactiva';
+          estadoIcon = Icons.pause_circle_filled;
+        }
 
-                // Información del equipo
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        equipo.nombre,
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tarjeta de competencia
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.shade300,
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.emoji_events,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        equipo.competenciaNombre,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.textPrimary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            FontAwesomeIcons.users,
-                            size: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '15 participantes',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: estadoBgColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        estadoTexto,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: estadoTextColor,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Tarjeta del equipo
+              Opacity(
+                opacity: enCurso ? 1.0 : 0.5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient[0].withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: enCurso ? () => _seleccionarEquipo(equipo, enCurso) : () => _mostrarCompetenciaNoIniciada(),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: enCurso ? Colors.green.shade300 : Colors.grey.shade300,
+                            width: enCurso ? 2.5 : 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Badge del dorsal con gradiente
+                            Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: enCurso ? gradient : [Colors.grey.shade400, Colors.grey.shade500],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(15),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gradient[0].withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'DORSAL',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '#${equipo.dorsal}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
 
-                // Icono de flecha
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: gradient[0].withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    color: gradient[0],
-                    size: 18,
+                            // Información del equipo
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Nombre del equipo
+                                  Text(
+                                    equipo.nombre,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  
+                                  // Badge de estado EN CURSO
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: estadoBgColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          estadoIcon,
+                                          size: 12,
+                                          color: estadoTextColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          estadoTexto.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: estadoTextColor,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  
+                                  // Nombre de la competencia
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.emoji_events,
+                                        size: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          equipo.competenciaNombre,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  
+                                  // 15 participantes
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        FontAwesomeIcons.users,
+                                        size: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '15 participantes',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Icono de flecha o candado
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: enCurso ? gradient[0].withOpacity(0.1) : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                enCurso ? Icons.arrow_forward_ios : Icons.lock,
+                                color: enCurso ? gradient[0] : Colors.grey.shade500,
+                                size: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

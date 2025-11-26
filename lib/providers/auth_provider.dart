@@ -142,30 +142,44 @@ class AuthProvider extends ChangeNotifier {
 
   /// Obtiene un mensaje de error amigable
   String _getErrorMessage(dynamic error) {
-    final errorStr = error.toString();
+    final errorStr = error.toString().toLowerCase();
 
-    if (errorStr.contains('SocketException') ||
-        errorStr.contains('NetworkException')) {
-      return 'No hay conexión a internet';
+    if (errorStr.contains('socketexception') ||
+        errorStr.contains('networkexception') ||
+        errorStr.contains('failed host lookup')) {
+      return 'No hay conexión a internet. Verifica tu red WiFi.';
     }
 
-    if (errorStr.contains('401') || errorStr.contains('Unauthorized')) {
+    if (errorStr.contains('401') || errorStr.contains('unauthorized')) {
       return 'Usuario o contraseña incorrectos';
     }
 
-    if (errorStr.contains('403') || errorStr.contains('Forbidden')) {
-      return 'Usuario inactivo. Contacte al administrador';
+    if (errorStr.contains('403') || errorStr.contains('forbidden')) {
+      return 'Usuario inactivo. Contacta al administrador';
+    }
+    
+    if (errorStr.contains('no tienes equipos asignados')) {
+      return 'No tienes equipos asignados. Contacta al administrador';
+    }
+    
+    if (errorStr.contains('no tienes competencias activas') || 
+        errorStr.contains('competencia no está activa')) {
+      return 'No hay competencias activas. Contacta al administrador';
     }
 
-    if (errorStr.contains('500')) {
-      return 'Error en el servidor. Intente más tarde';
+    if (errorStr.contains('500') || errorStr.contains('internal server error')) {
+      return 'Error en el servidor. Intenta más tarde';
     }
 
-    if (errorStr.contains('TimeoutException')) {
-      return 'La solicitud tardó demasiado. Intente nuevamente';
+    if (errorStr.contains('timeoutexception') || errorStr.contains('timed out')) {
+      return 'La solicitud tardó demasiado. Intenta nuevamente';
+    }
+    
+    if (errorStr.contains('connection refused')) {
+      return 'No se puede conectar al servidor. Verifica la configuración';
     }
 
-    return 'Error al iniciar sesión: $errorStr';
+    return 'Error al iniciar sesión. Por favor intenta nuevamente';
   }
 
   @override

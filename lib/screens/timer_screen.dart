@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -9,6 +10,7 @@ import '../models/competencia.dart';
 import '../widgets/time_mark_card.dart';
 import '../widgets/database_viewer_modal.dart';
 import '../services/connectivity_service.dart';
+import '../services/websocket_service.dart';
 
 class TimerScreen extends StatefulWidget {
   const TimerScreen({super.key});
@@ -18,10 +20,12 @@ class TimerScreen extends StatefulWidget {
 }
 
 class _TimerScreenState extends State<TimerScreen> {
+  StreamSubscription? _wsMessageSubscription;
+  
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
@@ -32,12 +36,169 @@ class _TimerScreenState extends State<TimerScreen> {
         final equipo = args['equipo'] as Equipo;
         final competencia = args['competencia'] as Competencia?;
 
-        timerProvider.setEquipo(equipo);
+        // Primero establecer la competencia para que el cronómetro
+        // se sincronice correctamente con el estado de ESTA competencia
         if (competencia != null) {
-          timerProvider.setCompetencia(competencia);
+          await timerProvider.setCompetencia(competencia);
         }
+        
+        // Luego establecer el equipo
+        await timerProvider.setEquipo(equipo);
+        
+        // Conectar el TimerProvider al WebSocket
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.juez != null) {
+          timerProvider.connectWebSocket(authProvider.juez!.id);
+          debugPrint('🔌 TimerProvider conectado al WebSocket');
+        }
+        
+        // Escuchar mensajes del WebSocket (incluyendo errores)
+        _subscribeToWebSocketMessages(timerProvider);
       }
     });
+  }
+  
+  void _subscribeToWebSocketMessages(TimerProvider timerProvider) {
+    // Cancelar suscripción anterior si existe
+    _wsMessageSubscription?.cancel();
+    
+    // Obtener el stream de mensajes WebSocket desde AuthProvider
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final messageStream = authProvider.repository.webSocketMessages;
+    
+    if (messageStream == null) {
+      debugPrint('⚠️ No hay stream de WebSocket disponible');
+      return;
+    }
+    
+    // Escuchar mensajes del WebSocket
+    _wsMessageSubscription = messageStream.listen(
+      (message) {
+        if (!mounted) return;
+        
+        // Manejar mensajes de error
+        if (message.type == WebSocketMessageType.error) {
+          final errorMsg = message.data['mensaje'] as String? ?? 'Error de conexión';
+          final errorTecnico = message.data['error_tecnico'] as String?;
+          
+          _mostrarErrorWebSocket(errorMsg, errorTecnico);
+        }
+        // Aquí puedes agregar otros tipos de mensajes en el futuro
+      },
+    );
+  }
+  
+  void _mostrarErrorWebSocket(String mensaje, String? errorTecnico) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline, color: Colors.red.shade700, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Error de Conexión',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              mensaje,
+              style: const TextStyle(fontSize: 15, height: 1.5),
+            ),
+            if (errorTecnico != null && errorTecnico.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ExpansionTile(
+                title: const Text(
+                  'Detalles técnicos',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      errorTecnico,
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Volver a la pantalla de equipos
+              Navigator.of(context).pop();
+            },
+            child: const Text('Volver'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Intentar reconectar
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final juezId = authProvider.juez?.id;
+              
+              if (juezId != null) {
+                try {
+                  await authProvider.repository.reconnectWebSocket(juezId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Reconectando...'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al reconectar: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  @override
+  void dispose() {
+    _wsMessageSubscription?.cancel();
+    super.dispose();
   }
 
   List<Color> _getEstadoColors(TimerProvider provider) {
@@ -50,41 +211,16 @@ class _TimerScreenState extends State<TimerScreen> {
     if (provider.isRunning) {
       return [const Color(0xFF667eea), const Color(0xFF764ba2)];
     }
-    if (provider.competenciaActual?.estaPorComenzar ?? false) {
-      return [const Color(0xFFFFA726), const Color(0xFFFF9800)];
-    }
     return [Colors.grey.shade400, Colors.grey.shade500];
   }
 
   IconData _getEstadoIcon(TimerProvider provider) {
     if (provider.isCompleted) return Icons.check_circle;
     if (provider.isRunning) return Icons.play_circle_filled;
-    if (provider.competenciaActual?.estaPorComenzar ?? false) {
-      return Icons.schedule;
-    }
     return Icons.pause_circle;
   }
 
-  String _getTiempoRestante(TimerProvider provider) {
-    if (provider.competenciaActual == null) return '';
 
-    final tiempoRestante = provider.tiempoHastaInicio;
-    if (tiempoRestante == null || tiempoRestante.inSeconds <= 0) {
-      return 'Iniciando automáticamente...';
-    }
-
-    final horas = tiempoRestante.inHours;
-    final minutos = tiempoRestante.inMinutes.remainder(60);
-    final segundos = tiempoRestante.inSeconds.remainder(60);
-
-    if (horas > 0) {
-      return 'Inicia en: ${horas}h ${minutos}m';
-    } else if (minutos > 0) {
-      return 'Inicia en: ${minutos}m ${segundos}s';
-    } else {
-      return 'Inicia en: ${segundos}s ⚡';
-    }
-  }
 
   void _mostrarConfirmacionEnvio(BuildContext context) async {
     final connectivityService = ConnectivityService();
@@ -439,6 +575,89 @@ class _TimerScreenState extends State<TimerScreen> {
 
   Future<void> _enviarDatos(BuildContext context) async {
     final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+
+    // Verificar si los datos ya fueron enviados
+    if (timerProvider.datosEnviados) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFA726), Color(0xFFFF9800)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Datos Ya Enviados',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Los datos de este equipo ya fueron enviados al servidor exitosamente.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.9),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFFFFA726),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
 
     // Guardar referencia al Navigator ANTES de cualquier operación async
     final navigator = Navigator.of(context);
@@ -1012,6 +1231,12 @@ class _TimerScreenState extends State<TimerScreen> {
               title: const Text('Cerrar Sesión'),
               onTap: () {
                 Navigator.pop(context);
+                
+                // Limpiar estado del timer antes de cerrar sesión
+                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+                timerProvider.clearAll();
+                
+                // Cerrar sesión
                 Provider.of<AuthProvider>(context, listen: false).logout();
                 Navigator.pushReplacementNamed(context, '/login');
               },
@@ -1260,44 +1485,6 @@ class _TimerScreenState extends State<TimerScreen> {
                                   ),
                           ),
                         ),
-                        // Mostrar tiempo faltante si está por comenzar
-                        if (timerProvider.competenciaActual?.estaPorComenzar ??
-                            false) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.orange.shade200,
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  color: Colors.orange.shade700,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _getTiempoRestante(timerProvider),
-                                  style: TextStyle(
-                                    color: Colors.orange.shade900,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                         // Botón de envío cuando se completa
                         if (timerProvider.isCompleted)
                           const SizedBox(height: 20),
@@ -1305,27 +1492,40 @@ class _TimerScreenState extends State<TimerScreen> {
                           Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                              ),
+                              gradient: timerProvider.datosEnviados
+                                  ? const LinearGradient(
+                                      colors: [Colors.grey, Colors.grey],
+                                    )
+                                  : const LinearGradient(
+                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                    ),
                               borderRadius: BorderRadius.circular(15),
                               boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF667eea,
-                                  ).withOpacity(0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 5),
-                                ),
+                                if (!timerProvider.datosEnviados)
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF667eea,
+                                    ).withOpacity(0.4),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 5),
+                                  ),
                               ],
                             ),
                             child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  _mostrarConfirmacionEnvio(context),
-                              icon: const Icon(Icons.cloud_upload, size: 20),
-                              label: const Text(
-                                'Enviar Data Recolectada',
-                                style: TextStyle(
+                              onPressed: timerProvider.datosEnviados
+                                  ? null
+                                  : () => _mostrarConfirmacionEnvio(context),
+                              icon: Icon(
+                                timerProvider.datosEnviados
+                                    ? Icons.check_circle
+                                    : Icons.cloud_upload,
+                                size: 20,
+                              ),
+                              label: Text(
+                                timerProvider.datosEnviados
+                                    ? 'Datos Ya Enviados'
+                                    : 'Enviar Data Recolectada',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.5,
@@ -1335,6 +1535,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
                                 foregroundColor: Colors.white,
+                                disabledForegroundColor: Colors.white70,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
