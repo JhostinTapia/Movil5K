@@ -157,7 +157,14 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
     );
   }
 
-  Future<void> _seleccionarEquipo(Equipo equipo) async {
+  Future<void> _seleccionarEquipo(Equipo equipo, bool enCurso) async {
+    // Si la competencia no está en curso, mostrar mensaje
+    if (!enCurso) {
+      if (!mounted) return;
+      _mostrarCompetenciaNoIniciada();
+      return;
+    }
+
     // Buscar la competencia específica del equipo
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -183,6 +190,55 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         ),
       );
     }
+  }
+
+  void _mostrarCompetenciaNoIniciada() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.schedule, color: Colors.orange.shade700, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Competencia no iniciada',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Esta competencia aún no ha comenzado.',
+              style: TextStyle(fontSize: 15, height: 1.5),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Solo puedes registrar tiempos de equipos cuya competencia esté en curso.',
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Retorna un mapa con el estado de la competencia de un equipo
@@ -629,190 +685,193 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
               const SizedBox(height: 8),
 
               // Tarjeta del equipo
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradient[0].withOpacity(0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
+              Opacity(
+                opacity: enCurso ? 1.0 : 0.5,
+                child: Container(
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () => _seleccionarEquipo(equipo),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: enCurso ? Colors.green.shade300 : gradient[0].withOpacity(0.3),
-                          width: enCurso ? 2.5 : 2,
-                        ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient[0].withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
                       ),
-                      child: Row(
-                        children: [
-                          // Badge del dorsal con gradiente
-                          Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: gradient,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(15),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: gradient[0].withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'DORSAL',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '#${equipo.dorsal}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: enCurso ? () => _seleccionarEquipo(equipo, enCurso) : () => _mostrarCompetenciaNoIniciada(),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: enCurso ? Colors.green.shade300 : Colors.grey.shade300,
+                            width: enCurso ? 2.5 : 2,
                           ),
-                          const SizedBox(width: 16),
-
-                          // Información del equipo
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Nombre del equipo
-                                Text(
-                                  equipo.nombre,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        ),
+                        child: Row(
+                          children: [
+                            // Badge del dorsal con gradiente
+                            Container(
+                              width: 70,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: enCurso ? gradient : [Colors.grey.shade400, Colors.grey.shade500],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                const SizedBox(height: 6),
-                                
-                                // Badge de estado EN CURSO
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
+                                borderRadius: BorderRadius.circular(15),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gradient[0].withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: estadoBgColor,
-                                    borderRadius: BorderRadius.circular(8),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'DORSAL',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '#${equipo.dorsal}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+
+                            // Información del equipo
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Nombre del equipo
+                                  Text(
+                                    equipo.nombre,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  
+                                  // Badge de estado EN CURSO
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: estadoBgColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          estadoIcon,
+                                          size: 12,
+                                          color: estadoTextColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          estadoTexto.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: estadoTextColor,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  
+                                  // Nombre de la competencia
+                                  Row(
                                     children: [
                                       Icon(
-                                        estadoIcon,
-                                        size: 12,
-                                        color: estadoTextColor,
+                                        Icons.emoji_events,
+                                        size: 11,
+                                        color: Colors.grey.shade600,
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        estadoTexto.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: estadoTextColor,
-                                          letterSpacing: 0.5,
+                                      Flexible(
+                                        child: Text(
+                                          equipo.competenciaNombre,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                
-                                // Nombre de la competencia
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.emoji_events,
-                                      size: 11,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        equipo.competenciaNombre,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                
-                                // 15 participantes
-                                Row(
-                                  children: [
-                                    Icon(
-                                      FontAwesomeIcons.users,
-                                      size: 11,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '15 participantes',
-                                      style: TextStyle(
-                                        fontSize: 12,
+                                  const SizedBox(height: 6),
+                                  
+                                  // 15 participantes
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        FontAwesomeIcons.users,
+                                        size: 11,
                                         color: Colors.grey.shade600,
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '15 participantes',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
 
-                          // Icono de flecha
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: gradient[0].withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
+                            // Icono de flecha o candado
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: enCurso ? gradient[0].withOpacity(0.1) : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                enCurso ? Icons.arrow_forward_ios : Icons.lock,
+                                color: enCurso ? gradient[0] : Colors.grey.shade500,
+                                size: 18,
+                              ),
                             ),
-                            child: Icon(
-                              Icons.arrow_forward_ios,
-                              color: gradient[0],
-                              size: 18,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
