@@ -50,6 +50,7 @@ class ApiService {
     Map<String, String>? headers,
     Map<String, String>? queryParameters,
     bool requiresAuth = true,
+    bool isRetry = false,
   }) async {
     try {
       final uri = Uri.parse(
@@ -66,7 +67,20 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw _handleError(e);
+      final error = _handleError(e);
+      
+      // Si es error 401 y no es un reintento, intentar refrescar token
+      if (!isRetry && requiresAuth && _isTokenExpiredError(error)) {
+        return await _retryWithRefreshedToken(() => get(
+          endpoint,
+          headers: headers,
+          queryParameters: queryParameters,
+          requiresAuth: requiresAuth,
+          isRetry: true,
+        ));
+      }
+      
+      throw error;
     }
   }
 
@@ -76,6 +90,7 @@ class ApiService {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
     bool requiresAuth = true,
+    bool isRetry = false,
   }) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
@@ -94,7 +109,20 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw _handleError(e);
+      final error = _handleError(e);
+      
+      // Si es error 401 y no es un reintento, intentar refrescar token
+      if (!isRetry && requiresAuth && _isTokenExpiredError(error)) {
+        return await _retryWithRefreshedToken(() => post(
+          endpoint,
+          headers: headers,
+          body: body,
+          requiresAuth: requiresAuth,
+          isRetry: true,
+        ));
+      }
+      
+      throw error;
     }
   }
 
@@ -104,6 +132,7 @@ class ApiService {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
     bool requiresAuth = true,
+    bool isRetry = false,
   }) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
@@ -122,7 +151,20 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw _handleError(e);
+      final error = _handleError(e);
+      
+      // Si es error 401 y no es un reintento, intentar refrescar token
+      if (!isRetry && requiresAuth && _isTokenExpiredError(error)) {
+        return await _retryWithRefreshedToken(() => put(
+          endpoint,
+          headers: headers,
+          body: body,
+          requiresAuth: requiresAuth,
+          isRetry: true,
+        ));
+      }
+      
+      throw error;
     }
   }
 
@@ -131,6 +173,7 @@ class ApiService {
     String endpoint, {
     Map<String, String>? headers,
     bool requiresAuth = true,
+    bool isRetry = false,
   }) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
@@ -145,7 +188,19 @@ class ApiService {
 
       return _handleResponse(response);
     } catch (e) {
-      throw _handleError(e);
+      final error = _handleError(e);
+      
+      // Si es error 401 y no es un reintento, intentar refrescar token
+      if (!isRetry && requiresAuth && _isTokenExpiredError(error)) {
+        return await _retryWithRefreshedToken(() => delete(
+          endpoint,
+          headers: headers,
+          requiresAuth: requiresAuth,
+          isRetry: true,
+        ));
+      }
+      
+      throw error;
     }
   }
 
@@ -188,6 +243,42 @@ class ApiService {
         statusCode: statusCode,
         data: response.body,
       );
+    }
+  }
+
+  /// Verifica si una petición falló por token expirado (401)
+  bool _isTokenExpiredError(ApiException e) {
+    return e.statusCode == 401 && 
+           (e.message.toLowerCase().contains('token') || 
+            e.message.toLowerCase().contains('unauthorized'));
+  }
+
+  /// Intenta refrescar el token y reintentar la petición
+  Future<Map<String, dynamic>> _retryWithRefreshedToken(
+    Future<Map<String, dynamic>> Function() request,
+  ) async {
+    try {
+      // Obtener refresh token
+      final refreshToken = await _storageService.getRefreshToken();
+      if (refreshToken == null) {
+        throw ApiException('No hay refresh token disponible', statusCode: 401);
+      }
+
+      // Refrescar el access token
+      final refreshResponse = await post(
+        '/api/token/refresh/',
+        body: {'refresh': refreshToken},
+        requiresAuth: false,
+      );
+
+      // Guardar nuevo access token
+      await _storageService.saveAccessToken(refreshResponse['access']);
+
+      // Reintentar la petición original
+      return await request();
+    } catch (e) {
+      // Si falla el refresh, propagar el error
+      throw _handleError(e);
     }
   }
 

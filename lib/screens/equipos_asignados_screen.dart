@@ -341,13 +341,6 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   }
 
   Future<void> _seleccionarEquipo(Equipo equipo, bool enCurso) async {
-    // Si la competencia no está en curso, mostrar mensaje
-    if (!enCurso) {
-      if (!mounted) return;
-      _mostrarCompetenciaNoIniciada();
-      return;
-    }
-
     // Buscar la competencia específica del equipo
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -386,55 +379,6 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         ),
       );
     }
-  }
-
-  void _mostrarCompetenciaNoIniciada() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.schedule, color: Colors.orange.shade700, size: 28),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Competencia no iniciada',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Esta competencia aún no ha comenzado.',
-              style: TextStyle(fontSize: 15, height: 1.5),
-            ),
-            SizedBox(height: 12),
-            Text(
-              'Solo puedes registrar tiempos de equipos cuya competencia esté en curso.',
-              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// Retorna un mapa con el estado de la competencia de un equipo
@@ -876,9 +820,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
               const SizedBox(height: 8),
 
               // Tarjeta del equipo
-              Opacity(
-                opacity: enCurso ? 1.0 : 0.5,
-                child: Container(
+              Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
@@ -893,15 +835,15 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
-                      onTap: enCurso ? () => _seleccionarEquipo(equipo, enCurso) : () => _mostrarCompetenciaNoIniciada(),
+                      onTap: () => _seleccionarEquipo(equipo, enCurso),
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: enCurso ? Colors.green.shade300 : Colors.grey.shade300,
-                            width: enCurso ? 2.5 : 2,
+                            color: Colors.green.shade300,
+                            width: 2.5,
                           ),
                         ),
                         child: Row(
@@ -912,7 +854,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                               height: 70,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: enCurso ? gradient : [Colors.grey.shade400, Colors.grey.shade500],
+                                  colors: gradient,
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -976,14 +918,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: enCurso 
-                                          ? Colors.green.shade50 
-                                          : Colors.grey.shade100,
+                                      color: Colors.green.shade50,
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: enCurso 
-                                            ? Colors.green.shade300 
-                                            : Colors.grey.shade300,
+                                        color: Colors.green.shade300,
                                         width: 1,
                                       ),
                                     ),
@@ -991,21 +929,17 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          enCurso ? Icons.check_circle : Icons.lock,
+                                          Icons.check_circle,
                                           size: 12,
-                                          color: enCurso 
-                                              ? Colors.green.shade700 
-                                              : Colors.grey.shade500,
+                                          color: Colors.green.shade700,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          enCurso ? 'Disponible' : 'Bloqueado',
+                                          'Disponible',
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: enCurso 
-                                                ? Colors.green.shade700 
-                                                : Colors.grey.shade600,
+                                            color: Colors.green.shade700,
                                           ),
                                         ),
                                       ],
@@ -1015,16 +949,16 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                               ),
                             ),
 
-                            // Icono de flecha o candado
+                            // Icono de flecha
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: enCurso ? gradient[0].withOpacity(0.1) : Colors.grey.shade200,
+                                color: gradient[0].withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
-                                enCurso ? Icons.arrow_forward_ios : Icons.lock,
-                                color: enCurso ? gradient[0] : Colors.grey.shade500,
+                                Icons.arrow_forward_ios,
+                                color: gradient[0],
                                 size: 18,
                               ),
                             ),
@@ -1033,7 +967,6 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                       ),
                     ),
                   ),
-                ),
               ),
             ],
           ),
