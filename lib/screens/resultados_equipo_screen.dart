@@ -33,9 +33,8 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
     final hours = milliseconds ~/ 3600000;
     final minutes = (milliseconds % 3600000) ~/ 60000;
     final seconds = (milliseconds % 60000) ~/ 1000;
-    final ms = (milliseconds % 1000) ~/ 10;
     
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}.${ms.toString().padLeft(2, '0')}';
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   Map<String, dynamic> _calcularEstadisticas(List<RegistroTiempo> registros) {
@@ -43,20 +42,26 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
       return {
         'mejorTiempo': 0,
         'peorTiempo': 0,
-        'promedio': 0,
+        'tiempoTotal': 0,
         'totalParticipantes': 0,
       };
     }
 
     final tiempos = registros.map((r) => r.tiempo).toList();
-    final mejorTiempo = tiempos.reduce((a, b) => a < b ? a : b);
+    
+    // Filtrar tiempos válidos (excluir penalizaciones de 00:00:00.00)
+    final tiemposValidos = tiempos.where((t) => t > 0).toList();
+    
+    final mejorTiempo = tiemposValidos.isNotEmpty 
+        ? tiemposValidos.reduce((a, b) => a < b ? a : b)
+        : 0;
     final peorTiempo = tiempos.reduce((a, b) => a > b ? a : b);
-    final promedio = tiempos.reduce((a, b) => a + b) ~/ tiempos.length;
+    final tiempoTotal = tiempos.reduce((a, b) => a + b);
 
     return {
       'mejorTiempo': mejorTiempo,
       'peorTiempo': peorTiempo,
-      'promedio': promedio,
+      'tiempoTotal': tiempoTotal,
       'totalParticipantes': registros.length,
     };
   }
@@ -198,7 +203,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                         ),
                         const SizedBox(height: 12),
                         
-                        // Promedio y Peor Tiempo
+                        // Tiempo Total y Peor Tiempo
                         Row(
                           children: [
                             Expanded(
@@ -224,7 +229,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      'Promedio',
+                                      'Tiempo Total',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey.shade600,
@@ -233,7 +238,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _formatearTiempo(estadisticas['promedio']),
+                                      _formatearTiempo(estadisticas['tiempoTotal']),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,

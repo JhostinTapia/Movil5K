@@ -76,7 +76,7 @@ class TimerProvider extends ChangeNotifier {
   int get milisegundos => elapsedMilliseconds % 1000;
 
   String get tiempoFormateado {
-    return '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}.${(milisegundos ~/ 10).toString().padLeft(2, '0')}';
+    return '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
   }
 
   // Estado de la competencia
@@ -636,7 +636,7 @@ class TimerProvider extends ChangeNotifier {
   ) async {
     if (_equipoActual == null ||
         jugadoresFaltantes <= 0 ||
-        minutosPenalizacion <= 0) {
+        minutosPenalizacion < 0) {
       debugPrint('⚠️ No se puede aplicar penalización: parámetros inválidos');
       return;
     }

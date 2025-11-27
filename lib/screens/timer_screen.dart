@@ -8,7 +8,6 @@ import '../config/theme.dart';
 import '../models/equipo.dart';
 import '../models/competencia.dart';
 import '../widgets/time_mark_card.dart';
-import '../widgets/database_viewer_modal.dart';
 import '../services/connectivity_service.dart';
 import '../services/websocket_service.dart';
 
@@ -897,8 +896,36 @@ class _TimerScreenState extends State<TimerScreen> {
 
   void _mostrarDialogPenalizacion(BuildContext context) {
     final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+    
+    // Validar que la carrera esté corriendo
+    if (!timerProvider.isRunning) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFFFFA726)),
+              SizedBox(width: 12),
+              Text('Carrera no iniciada'),
+            ],
+          ),
+          content: const Text(
+            'Solo puedes aplicar penalización cuando la carrera está en curso.',
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    
     int jugadoresFaltantes = 1; // Valor inicial
-    int minutosPenalizacion = 2; // Minutos de penalización por defecto
 
     showDialog(
       context: context,
@@ -948,7 +975,7 @@ class _TimerScreenState extends State<TimerScreen> {
 
                 // Descripción
                 Text(
-                  'Configura la cantidad de jugadores faltantes y el tiempo de penalización.',
+                  'Ingresa la cantidad de jugadores faltantes. Se crearán registros con tiempo 00:00:00.00',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -1012,79 +1039,13 @@ class _TimerScreenState extends State<TimerScreen> {
 
                           // Botón +
                           IconButton(
-                            onPressed: jugadoresFaltantes < 14
-                                ? () => setState(() => jugadoresFaltantes++)
-                                : null,
-                            icon: const Icon(Icons.add_circle),
-                            color: Colors.white,
-                            disabledColor: Colors.white.withOpacity(0.3),
-                            iconSize: 36,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Selector de minutos de penalización
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Minutos de Penalización',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Botón -
-                          IconButton(
-                            onPressed: minutosPenalizacion > 1
-                                ? () => setState(() => minutosPenalizacion--)
-                                : null,
-                            icon: const Icon(Icons.remove_circle),
-                            color: Colors.white,
-                            disabledColor: Colors.white.withOpacity(0.3),
-                            iconSize: 36,
-                          ),
-                          const SizedBox(width: 20),
-
-                          // Número
-                          Container(
-                            width: 70,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '$minutosPenalizacion',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFF57C00),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-
-                          // Botón +
-                          IconButton(
-                            onPressed: minutosPenalizacion < 30
-                                ? () => setState(() => minutosPenalizacion++)
-                                : null,
+                            onPressed: () {
+                              final registrosActuales = timerProvider.participantesRegistrados;
+                              final maxPosibles = 15 - registrosActuales;
+                              if (jugadoresFaltantes < maxPosibles) {
+                                setState(() => jugadoresFaltantes++);
+                              }
+                            },
                             icon: const Icon(Icons.add_circle),
                             color: Colors.white,
                             disabledColor: Colors.white.withOpacity(0.3),
@@ -1094,7 +1055,7 @@ class _TimerScreenState extends State<TimerScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Resumen de penalización
+                      // Información de registros
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1104,14 +1065,36 @@ class _TimerScreenState extends State<TimerScreen> {
                           color: Colors.amber.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text(
-                          'Se crearán $jugadoresFaltantes registros de $minutosPenalizacion min c/u',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Registros actuales: ${timerProvider.participantesRegistrados}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              'Se agregarán: $jugadoresFaltantes con tiempo 00:00:00.00',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              'Total: ${timerProvider.participantesRegistrados + jugadoresFaltantes}/15',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -1142,16 +1125,46 @@ class _TimerScreenState extends State<TimerScreen> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
+                          // Validar que no exceda 15 registros
+                          final totalRegistros = timerProvider.participantesRegistrados + jugadoresFaltantes;
+                          if (totalRegistros > 15) {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.error_outline, color: Colors.red),
+                                    SizedBox(width: 12),
+                                    Text('Inconsistencia'),
+                                  ],
+                                ),
+                                content: Text(
+                                  'No se puede aplicar la penalización.\n\nRegistros actuales: ${timerProvider.participantesRegistrados}\nJugadores faltantes: $jugadoresFaltantes\nTotal: $totalRegistros\n\nEl máximo permitido es 15 registros.',
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Entendido'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            return;
+                          }
+                          
                           Navigator.of(dialogContext).pop();
                           await timerProvider.aplicarPenalizacion(
                             jugadoresFaltantes,
-                            minutosPenalizacion,
+                            0, // 0 minutos = 00:00:00.00
                           );
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  '$jugadoresFaltantes registros de $minutosPenalizacion min agregados',
+                                  '$jugadoresFaltantes registros agregados con tiempo 00:00:00.00',
                                 ),
                                 backgroundColor: Colors.orange.shade700,
                                 behavior: SnackBarBehavior.floating,
@@ -1207,24 +1220,6 @@ class _TimerScreenState extends State<TimerScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(
-                Icons.storage_rounded,
-                color: AppTheme.primaryColor,
-              ),
-              title: const Text('Ver Base de Datos Local'),
-              subtitle: const Text('Registros almacenados en SQLite'),
-              onTap: () {
-                Navigator.pop(context);
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => const DatabaseViewerModal(),
-                );
-              },
-            ),
-            const Divider(),
             ListTile(
               leading: const Icon(
                 Icons.warning_amber_rounded,

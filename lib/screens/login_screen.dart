@@ -181,10 +181,10 @@ class _LoginScreenState extends State<LoginScreen>
       child: TextFormField(
         controller: _nombreController,
         style: TextStyle(color: Colors.grey.shade800, fontSize: 16),
-        keyboardType: TextInputType.emailAddress,
+        keyboardType: TextInputType.text,
         decoration: InputDecoration(
-          prefixIcon: Icon(Icons.email_outlined, color: Colors.grey.shade400),
-          hintText: 'Email',
+          prefixIcon: Icon(Icons.person_outline, color: Colors.grey.shade400),
+          hintText: 'Usuario o Email',
           hintStyle: TextStyle(color: Colors.grey.shade400),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -194,10 +194,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         validator: (value) {
           if (value == null || value.trim().isEmpty) {
-            return 'Por favor ingresa tu email';
-          }
-          if (!value.contains('@')) {
-            return 'Email inválido';
+            return 'Por favor ingresa tu usuario o email';
           }
           return null;
         },
