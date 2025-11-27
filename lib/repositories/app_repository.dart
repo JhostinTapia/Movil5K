@@ -241,6 +241,16 @@ class AppRepository {
     }
   }
 
+  /// Cuenta la cantidad de registros que tiene un equipo
+  Future<int> contarRegistrosEquipo(int equipoId) async {
+    try {
+      return await _databaseService.contarRegistrosEquipo(equipoId);
+    } catch (e) {
+      debugPrint('Error contando registros del equipo: $e');
+      return 0;
+    }
+  }
+
   // ==================== SINCRONIZACIÓN ====================
 
   /// Sincroniza los registros pendientes con el servidor

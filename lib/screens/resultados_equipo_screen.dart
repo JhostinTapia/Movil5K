@@ -44,10 +44,14 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
         'peorTiempo': 0,
         'tiempoTotal': 0,
         'totalParticipantes': 0,
+        'totalPenalizaciones': 0,
       };
     }
 
     final tiempos = registros.map((r) => r.tiempo).toList();
+    
+    // Contar penalizaciones (tiempo = 0)
+    final penalizaciones = registros.where((r) => r.tiempo == 0).length;
     
     // Filtrar tiempos válidos (excluir penalizaciones de 00:00:00.00)
     final tiemposValidos = tiempos.where((t) => t > 0).toList();
@@ -62,7 +66,8 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
       'mejorTiempo': mejorTiempo,
       'peorTiempo': peorTiempo,
       'tiempoTotal': tiempoTotal,
-      'totalParticipantes': registros.length,
+      'totalParticipantes': registros.length - penalizaciones, // Solo los que participaron
+      'totalPenalizaciones': penalizaciones,
     };
   }
 
@@ -109,47 +114,76 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.25),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'Dorsal #${timerProvider.equipoActual!.dorsal}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.25),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Dorsal #${timerProvider.equipoActual!.dorsal}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.white, width: 1),
-                                    ),
-                                    child: const Row(
-                                      children: [
-                                        Icon(Icons.check_circle, color: Colors.white, size: 14),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Datos Enviados',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.white, width: 1),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.check_circle, color: Colors.white, size: 14),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Datos Enviados',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    // Badge DESCALIFICADO si hay penalizaciones
+                                    if (estadisticas['totalPenalizaciones'] > 0) 
+                                      const SizedBox(width: 8),
+                                    if (estadisticas['totalPenalizaciones'] > 0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.redAccent, width: 1),
+                                        ),
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.cancel, color: Colors.redAccent, size: 14),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'DESCALIFICADO',
+                                              style: TextStyle(
+                                                color: Colors.redAccent,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -183,7 +217,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                               _buildEstadisticaItem(
                                 icon: FontAwesomeIcons.users,
                                 label: 'Participantes',
-                                valor: '${estadisticas['totalParticipantes']}',
+                                valor: '${estadisticas['totalParticipantes']}/15',
                                 color: const Color(0xFF667eea),
                               ),
                               Container(
@@ -381,7 +415,15 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                                     itemCount: timerProvider.registros.length,
                                     itemBuilder: (context, index) {
-                                      final registro = timerProvider.registros[index];
+                                      // Ordenar: registros normales primero, penalizaciones al final
+                                      final registrosOrdenados = [...timerProvider.registros]
+                                        ..sort((a, b) {
+                                          if (a.tiempo == 0 && b.tiempo != 0) return 1; // a al final
+                                          if (a.tiempo != 0 && b.tiempo == 0) return -1; // b al final
+                                          return 0; // mantener orden original
+                                        });
+                                      
+                                      final registro = registrosOrdenados[index];
                                       return TimeMarkCard(
                                         registro: registro,
                                         posicion: index + 1,

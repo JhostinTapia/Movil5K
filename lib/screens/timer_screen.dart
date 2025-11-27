@@ -975,7 +975,7 @@ class _TimerScreenState extends State<TimerScreen> {
 
                 // Descripción
                 Text(
-                  'Ingresa la cantidad de jugadores faltantes. Se crearán registros con tiempo 00:00:00.00',
+                  'Ingresa la cantidad de jugadores faltantes',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -1069,15 +1069,6 @@ class _TimerScreenState extends State<TimerScreen> {
                           children: [
                             Text(
                               'Registros actuales: ${timerProvider.participantesRegistrados}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              'Se agregarán: $jugadoresFaltantes con tiempo 00:00:00.00',
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 12,
@@ -1230,22 +1221,6 @@ class _TimerScreenState extends State<TimerScreen> {
               onTap: () {
                 Navigator.pop(context);
                 _mostrarDialogPenalizacion(context);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppTheme.errorColor),
-              title: const Text('Cerrar Sesión'),
-              onTap: () {
-                Navigator.pop(context);
-                
-                // Limpiar estado del timer antes de cerrar sesión
-                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
-                timerProvider.clearAll();
-                
-                // Cerrar sesión
-                Provider.of<AuthProvider>(context, listen: false).logout();
-                Navigator.pushReplacementNamed(context, '/login');
               },
             ),
           ],
@@ -1536,7 +1511,7 @@ class _TimerScreenState extends State<TimerScreen> {
                           label: Text(
                             timerProvider.datosEnviados
                                 ? 'Datos Ya Enviados'
-                                : 'Enviar Data Recolectada',
+                                : 'Enviar Registros de Tiempos',
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,

@@ -468,15 +468,47 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 size: 24,
                               ),
                               onPressed: () {
-                                // Limpiar estado del timer antes de cerrar sesión
-                                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
-                                timerProvider.clearAll();
-                                
-                                // Cerrar sesión
-                                authProvider.logout();
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  '/login',
+                                // Mostrar diálogo de confirmación
+                                showDialog(
+                                  context: context,
+                                  builder: (dialogContext) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.logout, color: AppTheme.errorColor),
+                                        SizedBox(width: 12),
+                                        Text('Cerrar Sesión'),
+                                      ],
+                                    ),
+                                    content: const Text(
+                                      '¿Estás seguro que deseas cerrar sesión?',
+                                      style: TextStyle(fontSize: 15),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(dialogContext),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pop(dialogContext);
+                                          
+                                          // Limpiar estado del timer antes de cerrar sesión
+                                          final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+                                          timerProvider.clearAll();
+                                          
+                                          // Cerrar sesión
+                                          authProvider.logout();
+                                          Navigator.pushReplacementNamed(context, '/login');
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppTheme.errorColor,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('Cerrar Sesión'),
+                                      ),
+                                    ],
+                                  ),
                                 );
                               },
                             ),
@@ -955,39 +987,52 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                           ),
                                         );
                                       } else {
-                                        // Equipo pendiente
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange.shade50,
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: Colors.orange.shade300,
-                                              width: 1,
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.pending_actions,
-                                                size: 12,
-                                                color: Colors.orange.shade700,
+                                        // Equipo pendiente - mostrar contador de registros
+                                        return FutureBuilder<int>(
+                                          future: Provider.of<AuthProvider>(context, listen: false)
+                                              .repository
+                                              .contarRegistrosEquipo(equipo.id),
+                                          builder: (context, registrosSnapshot) {
+                                            final cantidadRegistros = registrosSnapshot.data ?? 0;
+                                            
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
                                               ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Sin Registros',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.orange.shade700,
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.shade50,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: Colors.orange.shade300,
+                                                  width: 1,
                                                 ),
                                               ),
-                                            ],
-                                          ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    cantidadRegistros > 0 
+                                                        ? Icons.timer 
+                                                        : Icons.pending_actions,
+                                                    size: 12,
+                                                    color: Colors.orange.shade700,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    cantidadRegistros > 0
+                                                        ? '$cantidadRegistros Registros'
+                                                        : 'Sin Registros',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.orange.shade700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
                                         );
                                       }
                                     },
