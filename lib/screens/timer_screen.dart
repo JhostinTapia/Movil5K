@@ -1472,7 +1472,7 @@ class _TimerScreenState extends State<TimerScreen> {
                     ),
                   ),
                   
-                  // Botón de envío cuando hay 15 registros o está completado
+                  // Botón de envío cuando hay EXACTAMENTE 15 registros o está completado
                   if (timerProvider.participantesRegistrados >= 15 || timerProvider.isCompleted)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -1483,16 +1483,20 @@ class _TimerScreenState extends State<TimerScreen> {
                               ? const LinearGradient(
                                   colors: [Colors.grey, Colors.grey],
                                 )
-                              : const LinearGradient(
-                                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                                ),
+                              : (timerProvider.participantesRegistrados != 15)
+                                  ? const LinearGradient(
+                                      colors: [Colors.orange, Colors.deepOrange],
+                                    )
+                                  : const LinearGradient(
+                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                    ),
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
                             if (!timerProvider.datosEnviados)
                               BoxShadow(
-                                color: const Color(
-                                  0xFF667eea,
-                                ).withOpacity(0.4),
+                                color: (timerProvider.participantesRegistrados != 15
+                                    ? Colors.orange
+                                    : const Color(0xFF667eea)).withOpacity(0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 5),
                               ),
@@ -1501,17 +1505,23 @@ class _TimerScreenState extends State<TimerScreen> {
                         child: ElevatedButton.icon(
                           onPressed: timerProvider.datosEnviados
                               ? null
-                              : () => _mostrarConfirmacionEnvio(context),
+                              : (timerProvider.participantesRegistrados == 15)
+                                  ? () => _mostrarConfirmacionEnvio(context)
+                                  : null,
                           icon: Icon(
                             timerProvider.datosEnviados
                                 ? Icons.check_circle
-                                : Icons.cloud_upload,
+                                : (timerProvider.participantesRegistrados != 15)
+                                    ? Icons.warning
+                                    : Icons.cloud_upload,
                             size: 20,
                           ),
                           label: Text(
                             timerProvider.datosEnviados
                                 ? 'Datos Ya Enviados'
-                                : 'Enviar Registros de Tiempos',
+                                : (timerProvider.participantesRegistrados != 15)
+                                    ? 'Completa 15 Registros (${timerProvider.participantesRegistrados}/15)'
+                                    : 'Enviar Registros de Tiempos',
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,

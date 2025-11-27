@@ -751,6 +751,46 @@ class TimerProvider extends ChangeNotifier {
       return {'success': false, 'message': 'Envío en progreso'};
     }
 
+    // CARGAR registros desde BD local para validación ANTES de iniciar sincronización
+    debugPrint('📋 Validando registros desde BD local...');
+    final registrosDB = await _repository.getRegistrosByEquipo(_equipoActual!.id);
+    
+    // VALIDACIÓN CRÍTICA 1: Verificar que hay exactamente 15 registros
+    if (registrosDB.length != maxParticipantes) {
+      debugPrint('❌ VALIDACIÓN FALLIDA: Se requieren exactamente $maxParticipantes registros');
+      debugPrint('   - Registros actuales: ${registrosDB.length}');
+      return {
+        'success': false,
+        'message': 'Se requieren exactamente $maxParticipantes registros. Tienes ${registrosDB.length}.',
+      };
+    }
+    
+    // VALIDACIÓN CRÍTICA 2: Verificar que todos los registros pertenecen al equipo actual
+    final registrosInvalidos = registrosDB.where((r) => r.equipoId != _equipoActual!.id).toList();
+    if (registrosInvalidos.isNotEmpty) {
+      debugPrint('❌ VALIDACIÓN FALLIDA: Hay registros de otro equipo');
+      debugPrint('   - Registros inválidos: ${registrosInvalidos.length}');
+      return {
+        'success': false,
+        'message': 'Error de consistencia: Los registros no coinciden con el equipo actual',
+      };
+    }
+    
+    // VALIDACIÓN CRÍTICA 3: Verificar que ningún registro está ya sincronizado
+    final registrosSincronizados = registrosDB.where((r) => r.sincronizado).toList();
+    if (registrosSincronizados.isNotEmpty) {
+      debugPrint('❌ VALIDACIÓN FALLIDA: Hay registros ya sincronizados');
+      debugPrint('   - Registros sincronizados: ${registrosSincronizados.length}');
+      _datosEnviados = true; // Marcar como enviados
+      return {
+        'success': false,
+        'message': 'Los datos de este equipo ya fueron enviados al servidor',
+        'yaEnviado': true
+      };
+    }
+    
+    debugPrint('✅ Validaciones pasadas: ${registrosDB.length} registros válidos');
+
     _isSyncing = true;
     notifyListeners();
 
@@ -771,22 +811,20 @@ class TimerProvider extends ChangeNotifier {
         };
       }
 
-      // CARGAR registros desde BD local (no sincronizados)
-      debugPrint('📋 Cargando registros desde BD local...');
-      debugPrint('   - Equipo ID: ${_equipoActual!.id}');
-      final registrosDB = await _repository.getRegistrosByEquipo(
-        _equipoActual!.id,
-      );
-
-      if (registrosDB.isEmpty) {
-        _isSyncing = false;
-        notifyListeners();
-        return {'success': false, 'message': 'No hay registros para enviar'};
-      }
-
       debugPrint(
         '📤 Enviando ${registrosDB.length} registros por WebSocket...',
       );
+      
+      // VALIDACIÓN FINAL: Verificar nuevamente antes de enviar
+      if (registrosDB.length != maxParticipantes) {
+        _isSyncing = false;
+        notifyListeners();
+        debugPrint('❌ VALIDACIÓN FINAL FALLIDA: Cantidad incorrecta de registros');
+        return {
+          'success': false,
+          'message': 'Error: Se detectaron ${registrosDB.length} registros en lugar de $maxParticipantes',
+        };
+      }
 
       // Construir payload desde los registros de BD
       final payload = {
