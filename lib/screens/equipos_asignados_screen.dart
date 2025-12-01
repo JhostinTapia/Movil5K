@@ -392,7 +392,6 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
           id: 0,
           nombre: 'Desconocida',
           fechaHora: DateTime.now(),
-          categoria: 'estudiantes',
           activa: false,
           enCurso: false,
         ),

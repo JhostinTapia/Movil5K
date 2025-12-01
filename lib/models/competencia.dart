@@ -2,7 +2,6 @@ class Competencia {
   final int id;
   final String nombre;
   final DateTime fechaHora;
-  final String categoria;
   final bool activa;
   final bool enCurso;
   final DateTime? fechaInicio;
@@ -12,7 +11,6 @@ class Competencia {
     required this.id,
     required this.nombre,
     required this.fechaHora,
-    required this.categoria,
     this.activa = true,
     this.enCurso = false,
     this.fechaInicio,
@@ -24,7 +22,6 @@ class Competencia {
       id: json['id'],
       nombre: json['name'],
       fechaHora: DateTime.parse(json['datetime']),
-      categoria: json['category'],
       activa: json['is_active'] ?? true,
       enCurso: json['is_running'] ?? false,
       fechaInicio: json['started_at'] != null
@@ -41,18 +38,11 @@ class Competencia {
       'id': id,
       'name': nombre,
       'datetime': fechaHora.toIso8601String(),
-      'category': categoria,
       'is_active': activa,
       'is_running': enCurso,
       'started_at': fechaInicio?.toIso8601String(),
       'finished_at': fechaFin?.toIso8601String(),
     };
-  }
-
-  String get categoriaDisplay {
-    return categoria == 'estudiantes'
-        ? 'Estudiantes por Equipos'
-        : 'Interfacultades por Equipos';
   }
 
   // Verifica si la competencia ya comenzó
@@ -89,7 +79,6 @@ class Competencia {
     int? id,
     String? nombre,
     DateTime? fechaHora,
-    String? categoria,
     bool? activa,
     bool? enCurso,
     DateTime? fechaInicio,
@@ -99,7 +88,6 @@ class Competencia {
       id: id ?? this.id,
       nombre: nombre ?? this.nombre,
       fechaHora: fechaHora ?? this.fechaHora,
-      categoria: categoria ?? this.categoria,
       activa: activa ?? this.activa,
       enCurso: enCurso ?? this.enCurso,
       fechaInicio: fechaInicio ?? this.fechaInicio,
