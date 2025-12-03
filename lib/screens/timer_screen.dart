@@ -20,7 +20,7 @@ class TimerScreen extends StatefulWidget {
 
 class _TimerScreenState extends State<TimerScreen> {
   StreamSubscription? _wsMessageSubscription;
-  
+
   @override
   void initState() {
     super.initState();
@@ -40,53 +40,52 @@ class _TimerScreenState extends State<TimerScreen> {
         if (competencia != null) {
           await timerProvider.setCompetencia(competencia);
         }
-        
+
         // Luego establecer el equipo
         await timerProvider.setEquipo(equipo);
-        
+
         // Conectar el TimerProvider al WebSocket
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         if (authProvider.juez != null) {
           timerProvider.connectWebSocket(authProvider.juez!.id);
           debugPrint('🔌 TimerProvider conectado al WebSocket');
         }
-        
+
         // Escuchar mensajes del WebSocket (incluyendo errores)
         _subscribeToWebSocketMessages(timerProvider);
       }
     });
   }
-  
+
   void _subscribeToWebSocketMessages(TimerProvider timerProvider) {
     // Cancelar suscripción anterior si existe
     _wsMessageSubscription?.cancel();
-    
+
     // Obtener el stream de mensajes WebSocket desde AuthProvider
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final messageStream = authProvider.repository.webSocketMessages;
-    
+
     if (messageStream == null) {
       debugPrint('⚠️ No hay stream de WebSocket disponible');
       return;
     }
-    
+
     // Escuchar mensajes del WebSocket
-    _wsMessageSubscription = messageStream.listen(
-      (message) {
-        if (!mounted) return;
-        
-        // Manejar mensajes de error
-        if (message.type == WebSocketMessageType.error) {
-          final errorMsg = message.data['mensaje'] as String? ?? 'Error de conexión';
-          final errorTecnico = message.data['error_tecnico'] as String?;
-          
-          _mostrarErrorWebSocket(errorMsg, errorTecnico);
-        }
-        // Aquí puedes agregar otros tipos de mensajes en el futuro
-      },
-    );
+    _wsMessageSubscription = messageStream.listen((message) {
+      if (!mounted) return;
+
+      // Manejar mensajes de error
+      if (message.type == WebSocketMessageType.error) {
+        final errorMsg =
+            message.data['mensaje'] as String? ?? 'Error de conexión';
+        final errorTecnico = message.data['error_tecnico'] as String?;
+
+        _mostrarErrorWebSocket(errorMsg, errorTecnico);
+      }
+      // Aquí puedes agregar otros tipos de mensajes en el futuro
+    });
   }
-  
+
   void _mostrarErrorWebSocket(String mensaje, String? errorTecnico) {
     showDialog(
       context: context,
@@ -101,7 +100,11 @@ class _TimerScreenState extends State<TimerScreen> {
                 color: Colors.red.shade100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.error_outline, color: Colors.red.shade700, size: 28),
+              child: Icon(
+                Icons.error_outline,
+                color: Colors.red.shade700,
+                size: 28,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -116,10 +119,7 @@ class _TimerScreenState extends State<TimerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              mensaje,
-              style: const TextStyle(fontSize: 15, height: 1.5),
-            ),
+            Text(mensaje, style: const TextStyle(fontSize: 15, height: 1.5)),
             if (errorTecnico != null && errorTecnico.isNotEmpty) ...[
               const SizedBox(height: 16),
               ExpansionTile(
@@ -136,7 +136,10 @@ class _TimerScreenState extends State<TimerScreen> {
                     ),
                     child: Text(
                       errorTecnico,
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ],
@@ -157,9 +160,12 @@ class _TimerScreenState extends State<TimerScreen> {
             onPressed: () async {
               Navigator.of(context).pop();
               // Intentar reconectar
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final authProvider = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              );
               final juezId = authProvider.juez?.id;
-              
+
               if (juezId != null) {
                 try {
                   await authProvider.repository.reconnectWebSocket(juezId);
@@ -185,7 +191,9 @@ class _TimerScreenState extends State<TimerScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Reintentar'),
           ),
@@ -193,7 +201,7 @@ class _TimerScreenState extends State<TimerScreen> {
       ),
     );
   }
-  
+
   @override
   void dispose() {
     _wsMessageSubscription?.cancel();
@@ -218,8 +226,6 @@ class _TimerScreenState extends State<TimerScreen> {
     if (provider.isRunning) return Icons.play_circle_filled;
     return Icons.pause_circle;
   }
-
-
 
   void _mostrarConfirmacionEnvio(BuildContext context) async {
     final connectivityService = ConnectivityService();
@@ -896,13 +902,15 @@ class _TimerScreenState extends State<TimerScreen> {
 
   void _mostrarDialogPenalizacion(BuildContext context) {
     final timerProvider = Provider.of<TimerProvider>(context, listen: false);
-    
+
     // Validar que la carrera esté corriendo
     if (!timerProvider.isRunning) {
       showDialog(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Row(
             children: [
               Icon(Icons.info_outline, color: Color(0xFFFFA726)),
@@ -924,7 +932,7 @@ class _TimerScreenState extends State<TimerScreen> {
       );
       return;
     }
-    
+
     int jugadoresFaltantes = 1; // Valor inicial
 
     showDialog(
@@ -1040,7 +1048,8 @@ class _TimerScreenState extends State<TimerScreen> {
                           // Botón +
                           IconButton(
                             onPressed: () {
-                              final registrosActuales = timerProvider.participantesRegistrados;
+                              final registrosActuales =
+                                  timerProvider.participantesRegistrados;
                               final maxPosibles = 15 - registrosActuales;
                               if (jugadoresFaltantes < maxPosibles) {
                                 setState(() => jugadoresFaltantes++);
@@ -1117,16 +1126,23 @@ class _TimerScreenState extends State<TimerScreen> {
                       child: ElevatedButton(
                         onPressed: () async {
                           // Validar que no exceda 15 registros
-                          final totalRegistros = timerProvider.participantesRegistrados + jugadoresFaltantes;
+                          final totalRegistros =
+                              timerProvider.participantesRegistrados +
+                              jugadoresFaltantes;
                           if (totalRegistros > 15) {
                             Navigator.of(dialogContext).pop();
                             showDialog(
                               context: context,
                               builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                                 title: const Row(
                                   children: [
-                                    Icon(Icons.error_outline, color: Colors.red),
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red,
+                                    ),
                                     SizedBox(width: 12),
                                     Text('Inconsistencia'),
                                   ],
@@ -1145,7 +1161,7 @@ class _TimerScreenState extends State<TimerScreen> {
                             );
                             return;
                           }
-                          
+
                           Navigator.of(dialogContext).pop();
                           await timerProvider.aplicarPenalizacion(
                             jugadoresFaltantes,
@@ -1155,9 +1171,9 @@ class _TimerScreenState extends State<TimerScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  '$jugadoresFaltantes registros agregados con tiempo 00:00:00.00',
+                                  '$jugadoresFaltantes registros de jugadores penalizados',
                                 ),
-                                backgroundColor: Colors.orange.shade700,
+                                backgroundColor: Colors.black,
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
@@ -1197,33 +1213,55 @@ class _TimerScreenState extends State<TimerScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+      builder: (context) => SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(
-                Icons.warning_amber_rounded,
-                color: Color(0xFFF57C00),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF57C00).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFF57C00),
+                    size: 28,
+                  ),
+                ),
+                title: const Text(
+                  'Aplicar Penalización',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                subtitle: const Text(
+                  'Registrar jugadores ausentes (tiempo 00:00:00)',
+                  style: TextStyle(fontSize: 13),
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFFF57C00),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _mostrarDialogPenalizacion(context);
+                },
               ),
-              title: const Text('Aplicar Penalización'),
-              subtitle: const Text('Por jugadores faltantes'),
-              onTap: () {
-                Navigator.pop(context);
-                _mostrarDialogPenalizacion(context);
-              },
-            ),
-          ],
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );
@@ -1363,13 +1401,45 @@ class _TimerScreenState extends State<TimerScreen> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: Colors.white,
-                            size: 26,
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => _mostrarMenuOpciones(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.orange.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Colors.orange,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'Penal.',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          onPressed: () => _mostrarMenuOpciones(context),
                         ),
                       ],
                     ),
@@ -1439,41 +1509,43 @@ class _TimerScreenState extends State<TimerScreen> {
                           // Cronómetro
                           Text(
                             timerProvider.tiempoFormateado,
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                            height: 1.1,
-                            foreground: Paint()
-                              ..shader =
-                                  LinearGradient(
-                                    colors: timerProvider.isCompleted
-                                        ? [
-                                            AppTheme.secondaryColor,
-                                            AppTheme.secondaryColor.withOpacity(
-                                              0.8,
-                                            ),
-                                          ]
-                                        : timerProvider.isRunning
-                                        ? [
-                                            const Color(0xFF667eea),
-                                            const Color(0xFF764ba2),
-                                          ]
-                                        : [
-                                            Colors.grey.shade600,
-                                            Colors.grey.shade500,
-                                          ],
-                                  ).createShader(
-                                    const Rect.fromLTWH(0, 0, 200, 70),
-                                  ),
+                            style: TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              height: 1.1,
+                              foreground: Paint()
+                                ..shader =
+                                    LinearGradient(
+                                      colors: timerProvider.isCompleted
+                                          ? [
+                                              AppTheme.secondaryColor,
+                                              AppTheme.secondaryColor
+                                                  .withOpacity(0.8),
+                                            ]
+                                          : timerProvider.isRunning
+                                          ? [
+                                              const Color(0xFF667eea),
+                                              const Color(0xFF764ba2),
+                                            ]
+                                          : [
+                                              Colors.grey.shade600,
+                                              Colors.grey.shade500,
+                                            ],
+                                    ).createShader(
+                                      const Rect.fromLTWH(0, 0, 200, 70),
+                                    ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  
+
                   // Botón de envío cuando hay EXACTAMENTE 15 registros o está completado
-                  if (timerProvider.participantesRegistrados >= 15 || timerProvider.isCompleted)
+                  if (timerProvider.participantesRegistrados >= 15 ||
+                      timerProvider.isCompleted)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       child: Container(
@@ -1484,19 +1556,25 @@ class _TimerScreenState extends State<TimerScreen> {
                                   colors: [Colors.grey, Colors.grey],
                                 )
                               : (timerProvider.participantesRegistrados != 15)
-                                  ? const LinearGradient(
-                                      colors: [Colors.orange, Colors.deepOrange],
-                                    )
-                                  : const LinearGradient(
-                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                                    ),
+                              ? const LinearGradient(
+                                  colors: [Colors.orange, Colors.deepOrange],
+                                )
+                              : const LinearGradient(
+                                  colors: [
+                                    Color(0xFF667eea),
+                                    Color(0xFF764ba2),
+                                  ],
+                                ),
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
                             if (!timerProvider.datosEnviados)
                               BoxShadow(
-                                color: (timerProvider.participantesRegistrados != 15
-                                    ? Colors.orange
-                                    : const Color(0xFF667eea)).withOpacity(0.4),
+                                color:
+                                    (timerProvider.participantesRegistrados !=
+                                                15
+                                            ? Colors.orange
+                                            : const Color(0xFF667eea))
+                                        .withOpacity(0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 5),
                               ),
@@ -1506,22 +1584,22 @@ class _TimerScreenState extends State<TimerScreen> {
                           onPressed: timerProvider.datosEnviados
                               ? null
                               : (timerProvider.participantesRegistrados == 15)
-                                  ? () => _mostrarConfirmacionEnvio(context)
-                                  : null,
+                              ? () => _mostrarConfirmacionEnvio(context)
+                              : null,
                           icon: Icon(
                             timerProvider.datosEnviados
                                 ? Icons.check_circle
                                 : (timerProvider.participantesRegistrados != 15)
-                                    ? Icons.warning
-                                    : Icons.cloud_upload,
+                                ? Icons.warning
+                                : Icons.cloud_upload,
                             size: 20,
                           ),
                           label: Text(
                             timerProvider.datosEnviados
                                 ? 'Datos Ya Enviados'
                                 : (timerProvider.participantesRegistrados != 15)
-                                    ? 'Completa 15 Registros (${timerProvider.participantesRegistrados}/15)'
-                                    : 'Enviar Registros de Tiempos',
+                                ? 'Completa 15 Registros (${timerProvider.participantesRegistrados}/15)'
+                                : 'Enviar Registros de Tiempos',
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -1533,9 +1611,7 @@ class _TimerScreenState extends State<TimerScreen> {
                             shadowColor: Colors.transparent,
                             foregroundColor: Colors.white,
                             disabledForegroundColor: Colors.white70,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),
@@ -1734,7 +1810,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                       return TimeMarkCard(
                                         registro: registro,
                                         posicion: index + 1,
-                                        mostrarBotonEliminar: !timerProvider.datosEnviados,
+                                        mostrarBotonEliminar:
+                                            !timerProvider.datosEnviados,
                                         onDelete: () =>
                                             timerProvider.eliminarRegistro(
                                               registro.idRegistro,

@@ -321,8 +321,11 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -339,172 +342,196 @@ class _LoginScreenState extends State<LoginScreen>
               child: child,
             );
           },
-          child: Stack(
-            children: [
-              // Fondo con elementos decorativos
-              _buildBackground(),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                // Fondo con elementos decorativos
+                _buildBackground(),
 
-              // Contenido principal
-              SingleChildScrollView(
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height,
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 80),
-
-                      // Logo y título
-                      FadeTransition(
-                        opacity: _opacityAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: Column(
-                            children: [
-                              Hero(
-                                tag: 'logo',
-                                child: Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.3),
-                                      width: 2,
+                // Contenido principal
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              top: keyboardVisible ? 20 : 40,
+                              bottom: 20,
+                            ),
+                            child: Column(
+                              children: [
+                                // Logo y título - se reduce cuando el teclado está visible
+                                if (!keyboardVisible)
+                                  FadeTransition(
+                                    opacity: _opacityAnimation,
+                                    child: SlideTransition(
+                                      position: _slideAnimation,
+                                      child: Column(
+                                        children: [
+                                          Hero(
+                                            tag: 'logo',
+                                            child: Container(
+                                              width: screenHeight < 700 ? 80 : 100,
+                                              height: screenHeight < 700 ? 80 : 100,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.2),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: Colors.white.withOpacity(0.3),
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child: Icon(
+                                                FontAwesomeIcons.stopwatch,
+                                                color: Colors.white,
+                                                size: screenHeight < 700 ? 40 : 50,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Carrera 5K UNL',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: screenHeight < 700 ? 24 : 28,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.2,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Text(
+                                            'Sistema de Registro de Tiempos',
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.8),
+                                              fontSize: screenHeight < 700 ? 14 : 16,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  child: const Icon(
-                                    FontAwesomeIcons.stopwatch,
-                                    color: Colors.white,
-                                    size: 50,
+
+                                // Espacio flexible
+                                const Spacer(),
+
+                                // Formulario de login
+                                FadeTransition(
+                                  opacity: _opacityAnimation,
+                                  child: SlideTransition(
+                                    position: _slideAnimation,
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                                      padding: EdgeInsets.all(screenHeight < 700 ? 20 : 28),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(25),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 10),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Form(
+                                        key: _formKey,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Título del formulario
+                                            FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.all(8),
+                                                    decoration: BoxDecoration(
+                                                      color: AppTheme.primaryColor
+                                                          .withOpacity(0.1),
+                                                      borderRadius: BorderRadius.circular(
+                                                        8,
+                                                      ),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.person,
+                                                      color: AppTheme.primaryColor,
+                                                      size: 20,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  const Text(
+                                                    'Inicio de Sesión',
+                                                    style: TextStyle(
+                                                      fontSize: 20,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: AppTheme.textPrimary,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            SizedBox(height: screenHeight < 700 ? 18 : 25),
+
+                                            // Campo usuario/email
+                                            _buildNombreField(),
+                                            SizedBox(height: screenHeight < 700 ? 14 : 20),
+
+                                            // Campo contraseña
+                                            _buildPasswordField(),
+                                            SizedBox(height: screenHeight < 700 ? 18 : 25),
+
+                                            // Botón de login
+                                            _buildLoginButton(authProvider.isLoading),
+                                            SizedBox(height: screenHeight < 700 ? 14 : 20),
+
+                                            // Información adicional
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.info_outline,
+                                                  color: Colors.grey.shade500,
+                                                  size: 16,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Flexible(
+                                                  child: Text(
+                                                    'Ingresa con tu usuario o email',
+                                                    style: TextStyle(
+                                                      color: Colors.grey.shade600,
+                                                      fontSize: 12,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Carrera 5K UNL',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                'Sistema de Registro de Tiempos',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.8),
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
 
-                      const Spacer(),
-
-                      // Formulario de login
-                      FadeTransition(
-                        opacity: _opacityAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 25),
-                            padding: const EdgeInsets.all(30),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(25),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
+                                // Espacio inferior flexible
+                                SizedBox(height: keyboardVisible ? 20 : 30),
                               ],
                             ),
-                            child: Form(
-                              key: _formKey,
-                              child: Column(
-                                children: [
-                                  // Título del formulario
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryColor
-                                              .withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.person,
-                                          color: AppTheme.primaryColor,
-                                          size: 20,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      const Text(
-                                        'Inicio de Sesión - Juez',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.textPrimary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 25),
-
-                                  // Campo email
-                                  _buildNombreField(),
-                                  const SizedBox(height: 20),
-
-                                  // Campo contraseña
-                                  _buildPasswordField(),
-                                  const SizedBox(height: 25),
-
-                                  // Botón de login
-                                  _buildLoginButton(authProvider.isLoading),
-                                  const SizedBox(height: 20),
-
-                                  // Información adicional
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.info_outline,
-                                        color: Colors.grey.shade500,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Sistema autónomo con sincronización automática',
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 50),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
