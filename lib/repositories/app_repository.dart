@@ -325,8 +325,61 @@ class AppRepository {
     try {
       return await _apiService.getEstadoRegistros(equipoId);
     } catch (e) {
-      debugPrint('Error obteniendo estado de registros: $e');
+      debugPrint('Error obteniendo estado de registros del servidor: $e');
       rethrow;
+    }
+  }
+
+  /// Sincroniza registros desde el servidor a la BD local
+  /// Retorna true si había registros en el servidor
+  Future<bool> sincronizarRegistrosDesdeServidor(int equipoId) async {
+    try {
+      final estado = await _apiService.getEstadoRegistros(equipoId);
+      final registrosServidor = estado['registros'] as List<dynamic>? ?? [];
+      
+      if (registrosServidor.isEmpty) {
+        // IMPORTANTE: Si el servidor dice que NO hay registros,
+        // limpiar cualquier dato residual en la BD local
+        // Esto asegura consistencia servidor <-> cliente
+        final registrosLocales = await _databaseService.contarRegistrosEquipo(equipoId);
+        if (registrosLocales > 0) {
+          debugPrint('🧹 Servidor vacío pero BD local tiene $registrosLocales registros');
+          debugPrint('   Limpiando registros locales del equipo $equipoId...');
+          await _databaseService.eliminarRegistrosEquipo(equipoId);
+          debugPrint('   ✅ Registros locales eliminados');
+        }
+        return false;
+      }
+      
+      debugPrint('📥 Sincronizando ${registrosServidor.length} registros desde servidor');
+      
+      // Guardar cada registro en la BD local (marcado como sincronizado)
+      for (final regData in registrosServidor) {
+        final registro = RegistroTiempo(
+          idRegistro: regData['id_registro'] ?? '',
+          equipoId: equipoId,
+          tiempo: regData['tiempo'] ?? 0,
+          horas: regData['horas'] ?? 0,
+          minutos: regData['minutos'] ?? 0,
+          segundos: regData['segundos'] ?? 0,
+          milisegundos: regData['milisegundos'] ?? 0,
+          timestamp: DateTime.now(),
+          sincronizado: true, // Ya está en el servidor
+        );
+        
+        try {
+          await _databaseService.insertRegistroTiempo(registro);
+        } catch (e) {
+          // Si ya existe, ignorar (idempotencia)
+          debugPrint('   Registro ${registro.idRegistro} ya existe localmente');
+        }
+      }
+      
+      debugPrint('✅ Registros sincronizados desde servidor: ${registrosServidor.length}');
+      return true;
+    } catch (e) {
+      debugPrint('Error sincronizando desde servidor: $e');
+      return false;
     }
   }
 

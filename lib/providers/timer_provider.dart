@@ -71,6 +71,15 @@ class TimerProvider extends ChangeNotifier {
   bool get datosEnviados => _datosEnviados;
   bool get marcandoTiempo => _marcandoTiempo; // Exponer estado del lock
 
+  /// Marca manualmente los datos como enviados
+  /// Útil cuando el servidor confirma que ya tiene los registros (error 409)
+  void marcarComoEnviado() {
+    _datosEnviados = true;
+    _isCompleted = true;
+    notifyListeners();
+    debugPrint('✅ Datos marcados como enviados manualmente');
+  }
+
   // Getters individuales para componentes de tiempo
   int get horas => elapsedMilliseconds ~/ 3600000;
   int get minutos => (elapsedMilliseconds % 3600000) ~/ 60000;
@@ -123,36 +132,66 @@ class TimerProvider extends ChangeNotifier {
   }
 
   /// Establece el equipo actual y carga sus registros
+  /// Consulta al servidor para sincronizar registros si existen
   Future<void> setEquipo(Equipo equipo) async {
     debugPrint('👥 Estableciendo equipo: ${equipo.nombre} (ID: ${equipo.id})');
-    _equipoActual = equipo;
-
-    // Verificar si el equipo ya tiene registros sincronizados
-    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
-    _datosEnviados = yaEnviado;
     
-    if (yaEnviado) {
-      debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados previamente');
+    // IMPORTANTE: Resetear TODO el estado ANTES de cualquier operación
+    // Esto evita que la UI muestre estados residuales del equipo anterior
+    _datosEnviados = false;
+    _isCompleted = false;
+    _registros.clear();
+    _equipoActual = equipo;
+    
+    // Notificar inmediatamente para que la UI muestre estado limpio
+    notifyListeners();
+    debugPrint('   🧹 Estado reseteado: datosEnviados=false, isCompleted=false, registros=0');
+
+    // PASO 1: Consultar al servidor si el equipo ya tiene registros
+    // Esto es importante cuando el juez inicia sesión desde otro dispositivo
+    try {
+      debugPrint('   📡 Consultando registros en el servidor...');
+      final tieneEnServidor = await _repository.sincronizarRegistrosDesdeServidor(equipo.id);
+      
+      if (tieneEnServidor) {
+        debugPrint('   ✅ Registros encontrados en servidor y sincronizados');
+        _datosEnviados = true;
+      } else {
+        debugPrint('   📭 No hay registros en el servidor');
+      }
+    } catch (e) {
+      debugPrint('   ⚠️ No se pudo consultar servidor (offline?): $e');
+      // Continuar con BD local si no hay conexión
     }
 
-    // Cargar registros desde BD local para continuar donde se quedó
+    // PASO 2: Verificar en BD local si hay registros sincronizados
+    if (!_datosEnviados) {
+      final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
+      _datosEnviados = yaEnviado;
+      
+      if (yaEnviado) {
+        debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
+      }
+    }
+
+    // PASO 3: Cargar registros desde BD local
     await reloadRegistros();
 
-    debugPrint('   - Registros cargados desde BD: ${_registros.length}');
-    debugPrint('   - Datos enviados previamente: $_datosEnviados');
+    debugPrint('   - Registros cargados: ${_registros.length}');
+    debugPrint('   - Datos enviados: $_datosEnviados');
 
     // Solo marcar como completado si los datos fueron enviados
-    // NO por tener 15 registros
     if (_datosEnviados) {
       _isCompleted = true;
       debugPrint('   ✅ Equipo marcado como completado (datos ya enviados)');
     } else if (_registros.length >= maxParticipantes) {
       debugPrint(
-        '   ℹ️ Ya hay ${_registros.length} registros (máx: $maxParticipantes), pero aún no se han enviado',
+        '   ℹ️ Ya hay ${_registros.length} registros, pero aún no se han enviado',
       );
-      _isCompleted = false; // Permitir continuar hasta que se envíen
+      _isCompleted = false;
     } else {
       _isCompleted = false;
+      debugPrint('   📝 Equipo listo para registrar tiempos');
     }
 
     notifyListeners();

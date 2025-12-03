@@ -253,6 +253,19 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       // Cargar TODOS los equipos asignados al juez (sin filtrar)
       final todosLosEquipos = await authProvider.repository.getEquipos();
 
+      // SINCRONIZAR registros de cada equipo con el servidor
+      // Esto asegura que los badges muestren el estado correcto
+      debugPrint('📡 Sincronizando registros de ${todosLosEquipos.length} equipos...');
+      for (final equipo in todosLosEquipos) {
+        try {
+          await authProvider.repository.sincronizarRegistrosDesdeServidor(equipo.id);
+        } catch (e) {
+          // Ignorar errores de sincronización individual
+          debugPrint('   ⚠️ Error sincronizando equipo ${equipo.id}: $e');
+        }
+      }
+      debugPrint('✅ Sincronización de equipos completada');
+
       setState(() {
         equiposAsignados = todosLosEquipos; // Todos los equipos, sin filtrar
         isLoading = false;
@@ -341,7 +354,27 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   }
 
   Future<void> _seleccionarEquipo(Equipo equipo, bool enCurso) async {
-    // Buscar la competencia específica del equipo
+    // Mostrar indicador de carga mientras verificamos
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Verificando equipo...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final competencias = await authProvider.repository.getCompetencias();
@@ -350,20 +383,41 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         orElse: () => competencia!,
       );
       
+      // IMPORTANTE: Sincronizar desde el servidor PRIMERO
+      // Esto descarga los registros si existen en el servidor (otro dispositivo)
+      bool tieneEnServidor = false;
+      try {
+        tieneEnServidor = await authProvider.repository.sincronizarRegistrosDesdeServidor(equipo.id);
+        debugPrint('📡 Sincronización servidor: tieneRegistros=$tieneEnServidor');
+      } catch (e) {
+        debugPrint('⚠️ No se pudo sincronizar con servidor: $e');
+        // Continuar con verificación local si no hay conexión
+      }
+      
+      // Verificar en BD local (puede tener datos de sincronización anterior o del servidor)
+      final yaEnviadoLocal = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
+      
+      // El equipo tiene datos si: servidor dice que sí O BD local dice que sí
+      final tieneRegistros = tieneEnServidor || yaEnviadoLocal;
+      
+      debugPrint('📊 Estado equipo ${equipo.nombre}: servidor=$tieneEnServidor, local=$yaEnviadoLocal, final=$tieneRegistros');
+      
       if (!mounted) return;
       
-      // Verificar si el equipo ya tiene datos enviados
-      final yaEnviado = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
+      // Cerrar el loading
+      Navigator.of(context).pop();
       
-      if (yaEnviado) {
-        // Si ya envió datos, ir a pantalla de resultados
+      if (tieneRegistros) {
+        // Si ya tiene datos, ir directo a pantalla de resultados
+        debugPrint('➡️ Navegando a /resultados (equipo ya tiene registros)');
         Navigator.pushNamed(
           context,
           '/resultados',
           arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
         );
       } else {
-        // Si no ha enviado, ir a pantalla de registro de tiempos
+        // Si no tiene datos, ir a pantalla de registro de tiempos
+        debugPrint('➡️ Navegando a /timer (equipo sin registros)');
         Navigator.pushNamed(
           context,
           '/timer',
@@ -371,10 +425,14 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         );
       }
     } catch (e) {
+      // Cerrar el loading si está abierto
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al cargar competencia: $e'),
+          content: Text('Error al cargar equipo: $e'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
