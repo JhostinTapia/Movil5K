@@ -1623,7 +1623,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   const SizedBox(height: 12),
 
                   // Botón marcar tiempo
-                  if (timerProvider.isRunning && timerProvider.canAddMoreNow)
+                  if (timerProvider.isRunning && timerProvider.canAddMore)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
@@ -1746,79 +1746,89 @@ class _TimerScreenState extends State<TimerScreen> {
                               ],
                             ),
                           ),
-                          // Lista
+                          // Lista con Pull-to-Refresh
                           Expanded(
-                            child: timerProvider.registros.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                            child: RefreshIndicator(
+                              onRefresh: () => timerProvider.refrescarDatos(),
+                              color: const Color(0xFF667eea),
+                              backgroundColor: Colors.white,
+                              strokeWidth: 2.5,
+                              child: timerProvider.registros.isEmpty
+                                  ? ListView(
+                                      // ListView vacío para que funcione el pull-to-refresh
+                                      physics: const AlwaysScrollableScrollPhysics(),
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(20),
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                const Color(
-                                                  0xFF667eea,
-                                                ).withOpacity(0.1),
-                                                const Color(
-                                                  0xFF764ba2,
-                                                ).withOpacity(0.1),
-                                              ],
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            FontAwesomeIcons.clockRotateLeft,
-                                            size: 50,
-                                            color: Colors.grey.shade300,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'No hay registros',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Presiona "MARCAR TIEMPO" al\ncruce de cada participante',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade400,
+                                        SizedBox(
+                                          height: MediaQuery.of(context).size.height * 0.25,
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(20),
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      const Color(0xFF667eea).withOpacity(0.1),
+                                                      const Color(0xFF764ba2).withOpacity(0.1),
+                                                    ],
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  FontAwesomeIcons.clockRotateLeft,
+                                                  size: 50,
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'No hay registros',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                'Presiona "MARCAR TIEMPO" al\ncruce de cada participante',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey.shade400,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                '↓ Desliza para actualizar',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey.shade400,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
+                                    )
+                                  : ListView.builder(
+                                      physics: const AlwaysScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                      itemCount: timerProvider.registros.length,
+                                      itemBuilder: (context, index) {
+                                        final registro = timerProvider.registros[index];
+                                        return TimeMarkCard(
+                                          registro: registro,
+                                          posicion: index + 1,
+                                          mostrarBotonEliminar: !timerProvider.datosEnviados,
+                                          onDelete: () => timerProvider.eliminarRegistro(
+                                            registro.idRegistro,
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      0,
-                                      16,
-                                      16,
-                                    ),
-                                    itemCount: timerProvider.registros.length,
-                                    itemBuilder: (context, index) {
-                                      final registro =
-                                          timerProvider.registros[index];
-                                      return TimeMarkCard(
-                                        registro: registro,
-                                        posicion: index + 1,
-                                        mostrarBotonEliminar:
-                                            !timerProvider.datosEnviados,
-                                        onDelete: () =>
-                                            timerProvider.eliminarRegistro(
-                                              registro.idRegistro,
-                                            ),
-                                      );
-                                    },
-                                  ),
+                            ),
                           ),
                         ],
                       ),

@@ -66,7 +66,6 @@ class TimerProvider extends ChangeNotifier {
   int get participantesRegistrados => _registros.length;
   int get registrosPendientes => _registrosPendientes;
   bool get canAddMore => _registros.length < maxParticipantes;
-  bool get canAddMoreNow => canAddMore && !_marcandoTiempo; // Para la UI
   bool get hasPendingSync => _registrosPendientes > 0;
   bool get isWebSocketConnected => _repository.isWebSocketConnected;
   bool get datosEnviados => _datosEnviados;
@@ -573,6 +572,35 @@ class TimerProvider extends ChangeNotifier {
     }
   }
 
+  /// Refresca los datos desde la base de datos local
+  /// Usado por pull-to-refresh para dar confianza al usuario
+  Future<void> refrescarDatos() async {
+    if (_equipoActual == null) return;
+    
+    debugPrint('🔄 Refrescando datos...');
+    
+    try {
+      // Recargar registros desde BD
+      await _cargarRegistrosGuardados();
+      
+      // Actualizar estado de sincronización
+      await _updateSyncStatus();
+      
+      // Verificar si los datos ya fueron enviados
+      final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(_equipoActual!.id);
+      if (yaEnviado && !_datosEnviados) {
+        _datosEnviados = true;
+        _isCompleted = true;
+        debugPrint('   ✅ Datos ya sincronizados detectados');
+      }
+      
+      debugPrint('   ✅ Datos refrescados: ${_registros.length} registros');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('   ❌ Error al refrescar: $e');
+    }
+  }
+
   /// Marca un nuevo tiempo
   /// PROTECCIÓN: Lock para evitar doble-click y validación estricta del límite
   Future<void> marcarTiempo() async {
@@ -583,17 +611,13 @@ class TimerProvider extends ChangeNotifier {
     }
     
     _marcandoTiempo = true;
-    notifyListeners(); // Actualizar UI inmediatamente para deshabilitar botón
+    // NO llamar notifyListeners aquí para evitar parpadeo
     
     try {
       debugPrint('🏁 marcarTiempo() llamado');
-      debugPrint('   - puedeMarcarTiempo: $puedeMarcarTiempo');
-      debugPrint('   - isRunning: ${_stopwatch.isRunning}');
-      debugPrint('   - canAddMore: $canAddMore');
-      debugPrint('   - equipoActual: ${_equipoActual?.nombre}');
       debugPrint('   - registros actuales: ${_registros.length}');
 
-      // VALIDACIÓN ESTRICTA: Verificar límite en memoria Y en BD
+      // VALIDACIÓN ESTRICTA: Verificar límite en memoria
       if (_registros.length >= maxParticipantes) {
         debugPrint('❌ LÍMITE ALCANZADO en memoria: ${_registros.length}/$maxParticipantes');
         return;
@@ -622,47 +646,33 @@ class TimerProvider extends ChangeNotifier {
           timestamp: DateTime.now(),
         );
 
-        debugPrint('   ✅ Agregando registro: ${registro.idRegistro}');
-        debugPrint('      - Tiempo: $tiempo ms (${registro.tiempoFormateado})');
-        debugPrint('      - Equipo: ${_equipoActual!.nombre}');
+        debugPrint('   ✅ Agregando registro: ${registro.tiempoFormateado}');
 
         // GUARDAR en base de datos local PRIMERO (con validación)
         final guardadoExitoso = await _repository.saveRegistroTiempo(registro, _equipoActual!);
         
         if (!guardadoExitoso) {
           debugPrint('   ❌ No se pudo guardar - límite alcanzado en BD');
-          // Recargar registros desde BD para sincronizar
           await _cargarRegistrosGuardados();
           return;
         }
         
         // Solo agregar a memoria si se guardó exitosamente
         _registros.add(registro);
-        debugPrint('   💾 Registro guardado en BD local');
-        debugPrint(
-          '   - Total registros: ${_registros.length}/${maxParticipantes}',
-        );
+        debugPrint('   💾 Guardado: ${_registros.length}/$maxParticipantes');
 
-        // Ya NO detenemos el cronómetro al alcanzar el máximo
-        // Solo se detendrá cuando se envíen los datos
         if (_registros.length >= maxParticipantes) {
-          debugPrint(
-            '   🎯 Máximo de participantes alcanzado (${_registros.length}/$maxParticipantes)',
-          );
-          debugPrint(
-            '   ℹ️ Cronómetro sigue corriendo. Presiona "Enviar Data" para finalizar.',
-          );
+          debugPrint('   🎯 Máximo alcanzado - listo para enviar');
         }
 
+        // UN SOLO notifyListeners al final
         notifyListeners();
       } else {
-        debugPrint('   ⚠️ No se puede marcar tiempo:');
-        debugPrint('      - puedeMarcarTiempo: $puedeMarcarTiempo');
-        debugPrint('      - equipoActual null: ${_equipoActual == null}');
+        debugPrint('   ⚠️ No se puede marcar tiempo');
       }
     } finally {
-      _marcandoTiempo = false; // Liberar lock siempre
-      notifyListeners(); // Actualizar UI para rehabilitar botón
+      _marcandoTiempo = false;
+      // NO llamar notifyListeners aquí - ya se llamó arriba si hubo cambios
     }
   }
 
