@@ -416,6 +416,30 @@ class ApiService {
     return await get('/api/equipos/$id/');
   }
 
+  // ==================== REGISTROS DE TIEMPO ====================
+
+  /// Enviar registros de tiempo por HTTP (más confiable que WebSocket)
+  /// 
+  /// Este método envía los 15 tiempos de un equipo de manera atómica.
+  /// Returns: {"exito": true, "mensaje": "...", "registros": [...]}
+  Future<Map<String, dynamic>> enviarRegistros({
+    required int equipoId,
+    required List<Map<String, dynamic>> registros,
+  }) async {
+    return await post(
+      '/api/equipos/$equipoId/registros/',
+      body: {'registros': registros},
+      requiresAuth: true,
+    );
+  }
+
+  /// Verificar estado de registros de un equipo
+  /// 
+  /// Returns: {"puede_enviar": true/false, "total_registros": 0, ...}
+  Future<Map<String, dynamic>> getEstadoRegistros(int equipoId) async {
+    return await get('/api/equipos/$equipoId/registros/estado/');
+  }
+
   /// Liberar recursos
   void dispose() {
     _client.close();

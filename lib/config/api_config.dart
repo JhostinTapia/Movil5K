@@ -6,7 +6,7 @@ class ApiConfig {
   static const String baseUrl = kIsWeb
       ? 'http://127.0.0.1:8000' // Para navegador web
       // : 'http://192.168.0.190:8000'; // Para móvil (IP WiFi de tu laptop)
-      : 'http://192.168.0.190:8000'; // Para móvil (IP WiFi de tu laptop)
+      : 'http://192.168.0.108:8000'; // Para móvil (IP WiFi de tu laptop)
   // : 'http://10.20.142:8000'; // Para móvil (IP WiFi de tu laptop)
 
   // static const String baseUrl = 'http://10.0.2.2:8000'; // Para emulador Android

@@ -1623,7 +1623,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   const SizedBox(height: 12),
 
                   // Botón marcar tiempo
-                  if (timerProvider.isRunning && timerProvider.canAddMore)
+                  if (timerProvider.isRunning && timerProvider.canAddMoreNow)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(

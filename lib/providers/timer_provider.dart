@@ -15,6 +15,7 @@ class TimerProvider extends ChangeNotifier {
   Timer? _checkTimer;
   Timer? _autoSyncTimer;
   final List<RegistroTiempo> _registros = [];
+  bool _marcandoTiempo = false; // Lock para evitar doble-click
   Equipo? _equipoActual;
   Competencia? _competenciaActual;
   bool _isCompleted = false;
@@ -65,9 +66,11 @@ class TimerProvider extends ChangeNotifier {
   int get participantesRegistrados => _registros.length;
   int get registrosPendientes => _registrosPendientes;
   bool get canAddMore => _registros.length < maxParticipantes;
+  bool get canAddMoreNow => canAddMore && !_marcandoTiempo; // Para la UI
   bool get hasPendingSync => _registrosPendientes > 0;
   bool get isWebSocketConnected => _repository.isWebSocketConnected;
   bool get datosEnviados => _datosEnviados;
+  bool get marcandoTiempo => _marcandoTiempo; // Exponer estado del lock
 
   // Getters individuales para componentes de tiempo
   int get horas => elapsedMilliseconds ~/ 3600000;
@@ -571,65 +574,101 @@ class TimerProvider extends ChangeNotifier {
   }
 
   /// Marca un nuevo tiempo
+  /// PROTECCIÓN: Lock para evitar doble-click y validación estricta del límite
   Future<void> marcarTiempo() async {
-    debugPrint('🏁 marcarTiempo() llamado');
-    debugPrint('   - puedeMarcarTiempo: $puedeMarcarTiempo');
-    debugPrint('   - isRunning: ${_stopwatch.isRunning}');
-    debugPrint('   - canAddMore: $canAddMore');
-    debugPrint('   - equipoActual: ${_equipoActual?.nombre}');
-    debugPrint('   - registros actuales: ${_registros.length}');
+    // LOCK: Evitar doble-click
+    if (_marcandoTiempo) {
+      debugPrint('⚠️ marcarTiempo() ignorado - ya hay una operación en curso');
+      return;
+    }
+    
+    _marcandoTiempo = true;
+    notifyListeners(); // Actualizar UI inmediatamente para deshabilitar botón
+    
+    try {
+      debugPrint('🏁 marcarTiempo() llamado');
+      debugPrint('   - puedeMarcarTiempo: $puedeMarcarTiempo');
+      debugPrint('   - isRunning: ${_stopwatch.isRunning}');
+      debugPrint('   - canAddMore: $canAddMore');
+      debugPrint('   - equipoActual: ${_equipoActual?.nombre}');
+      debugPrint('   - registros actuales: ${_registros.length}');
 
-    if (puedeMarcarTiempo && _equipoActual != null) {
-      // Usar el getter que calcula desde el timestamp del servidor
-      final tiempo = elapsedMilliseconds;
-      final registro = RegistroTiempo.fromTiempoTotal(
-        idRegistro: const Uuid().v4(),
-        equipoId: _equipoActual!.id,
-        tiempoMs: tiempo,
-        timestamp: DateTime.now(),
-      );
-
-      debugPrint('   ✅ Agregando registro: ${registro.idRegistro}');
-      debugPrint('      - Tiempo: $tiempo ms (${registro.tiempoFormateado})');
-      debugPrint('      - Equipo: ${_equipoActual!.nombre}');
-
-      _registros.add(registro);
-      debugPrint(
-        '   - Total registros en memoria: ${_registros.length}/${maxParticipantes}',
-      );
-
-      // Notificar inmediatamente para actualizar la UI
-      notifyListeners();
-
-      // GUARDAR en base de datos local
-      try {
-        await _repository.saveRegistroTiempo(registro, _equipoActual!);
-        debugPrint('   💾 Registro guardado en BD local');
-      } catch (e) {
-        debugPrint('   ⚠️ Error guardando en BD local: $e');
-      }
-
-      // Ya NO detenemos el cronómetro al alcanzar el máximo
-      // Solo se detendrá cuando se envíen los datos
+      // VALIDACIÓN ESTRICTA: Verificar límite en memoria Y en BD
       if (_registros.length >= maxParticipantes) {
-        debugPrint(
-          '   🎯 Máximo de participantes alcanzado (${_registros.length}/$maxParticipantes)',
-        );
-        debugPrint(
-          '   ℹ️ Cronómetro sigue corriendo. Presiona "Enviar Data" para finalizar.',
-        );
+        debugPrint('❌ LÍMITE ALCANZADO en memoria: ${_registros.length}/$maxParticipantes');
+        return;
+      }
+      
+      // Verificar también en BD (por si hay inconsistencia)
+      if (_equipoActual != null) {
+        final registrosEnBD = await _repository.getRegistrosByEquipo(_equipoActual!.id);
+        if (registrosEnBD.length >= maxParticipantes) {
+          debugPrint('❌ LÍMITE ALCANZADO en BD: ${registrosEnBD.length}/$maxParticipantes');
+          // Sincronizar memoria con BD
+          _registros.clear();
+          _registros.addAll(registrosEnBD);
+          notifyListeners();
+          return;
+        }
       }
 
-      notifyListeners();
-    } else {
-      debugPrint('   ⚠️ No se puede marcar tiempo:');
-      debugPrint('      - puedeMarcarTiempo: $puedeMarcarTiempo');
-      debugPrint('      - equipoActual null: ${_equipoActual == null}');
+      if (puedeMarcarTiempo && _equipoActual != null) {
+        // Usar el getter que calcula desde el timestamp del servidor
+        final tiempo = elapsedMilliseconds;
+        final registro = RegistroTiempo.fromTiempoTotal(
+          idRegistro: const Uuid().v4(),
+          equipoId: _equipoActual!.id,
+          tiempoMs: tiempo,
+          timestamp: DateTime.now(),
+        );
+
+        debugPrint('   ✅ Agregando registro: ${registro.idRegistro}');
+        debugPrint('      - Tiempo: $tiempo ms (${registro.tiempoFormateado})');
+        debugPrint('      - Equipo: ${_equipoActual!.nombre}');
+
+        // GUARDAR en base de datos local PRIMERO (con validación)
+        final guardadoExitoso = await _repository.saveRegistroTiempo(registro, _equipoActual!);
+        
+        if (!guardadoExitoso) {
+          debugPrint('   ❌ No se pudo guardar - límite alcanzado en BD');
+          // Recargar registros desde BD para sincronizar
+          await _cargarRegistrosGuardados();
+          return;
+        }
+        
+        // Solo agregar a memoria si se guardó exitosamente
+        _registros.add(registro);
+        debugPrint('   💾 Registro guardado en BD local');
+        debugPrint(
+          '   - Total registros: ${_registros.length}/${maxParticipantes}',
+        );
+
+        // Ya NO detenemos el cronómetro al alcanzar el máximo
+        // Solo se detendrá cuando se envíen los datos
+        if (_registros.length >= maxParticipantes) {
+          debugPrint(
+            '   🎯 Máximo de participantes alcanzado (${_registros.length}/$maxParticipantes)',
+          );
+          debugPrint(
+            '   ℹ️ Cronómetro sigue corriendo. Presiona "Enviar Data" para finalizar.',
+          );
+        }
+
+        notifyListeners();
+      } else {
+        debugPrint('   ⚠️ No se puede marcar tiempo:');
+        debugPrint('      - puedeMarcarTiempo: $puedeMarcarTiempo');
+        debugPrint('      - equipoActual null: ${_equipoActual == null}');
+      }
+    } finally {
+      _marcandoTiempo = false; // Liberar lock siempre
+      notifyListeners(); // Actualizar UI para rehabilitar botón
     }
   }
 
   /// Aplica penalización por jugadores faltantes
   /// Genera N registros de tiempo ficticios con el tiempo de penalización especificado
+  /// PROTECCIÓN: Valida que no se excedan los 15 registros máximos
   Future<void> aplicarPenalizacion(
     int jugadoresFaltantes,
     int minutosPenalizacion,
@@ -640,19 +679,42 @@ class TimerProvider extends ChangeNotifier {
       debugPrint('⚠️ No se puede aplicar penalización: parámetros inválidos');
       return;
     }
+    
+    // VALIDACIÓN CRÍTICA: No permitir superar el límite
+    final registrosActuales = _registros.length;
+    final espacioDisponible = maxParticipantes - registrosActuales;
+    
+    if (espacioDisponible <= 0) {
+      debugPrint('❌ No hay espacio para penalizaciones. Ya hay $registrosActuales/$maxParticipantes registros');
+      return;
+    }
+    
+    // Limitar la cantidad de penalizaciones al espacio disponible
+    final penalizacionesAAplicar = jugadoresFaltantes > espacioDisponible 
+        ? espacioDisponible 
+        : jugadoresFaltantes;
+    
+    if (penalizacionesAAplicar != jugadoresFaltantes) {
+      debugPrint('⚠️ Ajustando penalizaciones: solicitadas=$jugadoresFaltantes, aplicables=$penalizacionesAAplicar');
+    }
 
     debugPrint('⚖️ Aplicando penalización...');
-    debugPrint('   - Jugadores faltantes: $jugadoresFaltantes');
+    debugPrint('   - Registros actuales: $registrosActuales/$maxParticipantes');
+    debugPrint('   - Espacio disponible: $espacioDisponible');
+    debugPrint('   - Penalizaciones a aplicar: $penalizacionesAAplicar');
     debugPrint('   - Minutos por registro: $minutosPenalizacion');
-    debugPrint(
-      '   - Total registros a crear: $jugadoresFaltantes de $minutosPenalizacion min c/u',
-    );
 
     final penalizacionMs =
         minutosPenalizacion * 60 * 1000; // Convertir minutos a ms
 
-    // Crear N registros (uno por cada jugador faltante)
-    for (int i = 0; i < jugadoresFaltantes; i++) {
+    // Crear N registros (uno por cada jugador faltante, limitado al espacio disponible)
+    for (int i = 0; i < penalizacionesAAplicar; i++) {
+      // Verificar antes de cada inserción
+      if (_registros.length >= maxParticipantes) {
+        debugPrint('❌ Límite alcanzado durante penalización. Deteniendo.');
+        break;
+      }
+      
       final registro = RegistroTiempo.fromTiempoTotal(
         idRegistro: const Uuid().v4(),
         equipoId: _equipoActual!.id,
@@ -661,21 +723,22 @@ class TimerProvider extends ChangeNotifier {
         penalizado: true,
       );
 
-      debugPrint('   ✅ Creando registro ${i + 1}/$jugadoresFaltantes');
+      debugPrint('   ✅ Creando registro ${i + 1}/$penalizacionesAAplicar');
       debugPrint('      - ID: ${registro.idRegistro}');
       debugPrint(
         '      - Tiempo: $penalizacionMs ms (${registro.tiempoFormateado})',
       );
 
-      _registros.add(registro);
-
-      // Guardar en BD local
-      try {
-        await _repository.saveRegistroTiempo(registro, _equipoActual!);
-        debugPrint('      💾 Guardado en BD local');
-      } catch (e) {
-        debugPrint('      ⚠️ Error guardando: $e');
+      // Guardar en BD local PRIMERO (con validación)
+      final guardadoExitoso = await _repository.saveRegistroTiempo(registro, _equipoActual!);
+      
+      if (!guardadoExitoso) {
+        debugPrint('      ❌ No se pudo guardar - límite alcanzado');
+        break; // Detener el loop
       }
+      
+      _registros.add(registro);
+      debugPrint('      💾 Guardado en BD local');
     }
 
     debugPrint(
@@ -711,10 +774,11 @@ class TimerProvider extends ChangeNotifier {
     }
   }
 
-  /// Envía los registros por WebSocket cuando el juez presiona "Enviar Data"
-  /// Lee los registros desde la BD local y los envía
+  /// Envía los registros por HTTP cuando el juez presiona "Enviar Data"
+  /// Lee los registros desde la BD local y los envía por HTTP POST
+  /// (más confiable que WebSocket para operaciones de guardado)
   Future<Map<String, dynamic>> enviarRegistrosPorWebSocket() async {
-    debugPrint('🚀 enviarRegistrosPorWebSocket() INICIADO');
+    debugPrint('🚀 enviarRegistrosPorHttp() INICIADO');
     debugPrint('   - _isSyncing: $_isSyncing');
     debugPrint('   - _equipoActual: ${_equipoActual?.nombre}');
     debugPrint('   - _datosEnviados: $_datosEnviados');
@@ -795,135 +859,24 @@ class TimerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Verificar si WebSocket está conectado
-      debugPrint('🔌 Verificando WebSocket...');
-      debugPrint(
-        '   - isWebSocketConnected: ${_repository.isWebSocketConnected}',
+      debugPrint('📤 Enviando ${registrosDB.length} registros por HTTP...');
+
+      // Enviar por HTTP usando el nuevo método del repository
+      final resultado = await _repository.enviarRegistrosPorHttp(
+        equipoId: _equipoActual!.id,
+        registros: registrosDB,
       );
 
-      if (!_repository.isWebSocketConnected) {
-        _isSyncing = false;
-        notifyListeners();
-        debugPrint('❌ WebSocket NO conectado');
-        return {
-          'success': false,
-          'message': 'WebSocket no conectado. Verifica tu conexión.',
-        };
-      }
+      debugPrint('📦 Resultado del servidor: $resultado');
 
-      debugPrint(
-        '📤 Enviando ${registrosDB.length} registros por WebSocket...',
-      );
-      
-      // VALIDACIÓN FINAL: Verificar nuevamente antes de enviar
-      if (registrosDB.length != maxParticipantes) {
-        _isSyncing = false;
-        notifyListeners();
-        debugPrint('❌ VALIDACIÓN FINAL FALLIDA: Cantidad incorrecta de registros');
-        return {
-          'success': false,
-          'message': 'Error: Se detectaron ${registrosDB.length} registros en lugar de $maxParticipantes',
-        };
-      }
-
-      // Construir payload desde los registros de BD
-      final payload = {
-        'tipo': 'registrar_tiempos',
-        'equipo_id': _equipoActual!.id,
-        'registros': registrosDB
-            .map(
-              (r) => {
-                'tiempo': r.tiempo,
-                'horas': r.horas,
-                'minutos': r.minutos,
-                'segundos': r.segundos,
-                'milisegundos': r.milisegundos,
-              },
-            )
-            .toList(),
-      };
-
-      debugPrint('📦 Payload a enviar:');
-      debugPrint('   - tipo: ${payload['tipo']}');
-      debugPrint('   - equipo_id: ${payload['equipo_id']}');
-      debugPrint(
-        '   - registros count: ${(payload['registros'] as List).length}',
-      );
-      debugPrint(
-        '   - primer registro: ${(payload['registros'] as List).first}',
-      );
-
-      // Crear completer para esperar respuesta
-      _envioCompleter = Completer<Map<String, dynamic>>();
-
-      // Escuchar mensajes WebSocket UNA VEZ para esta respuesta
-      StreamSubscription? responseSubscription;
-      responseSubscription = _repository.webSocketMessages?.listen((message) {
-        debugPrint('📩 Mensaje recibido en envío: ${message.type}');
-
-        if (message.type == WebSocketMessageType.tiemposRegistradosBatch) {
-          final data = message.data;
-          final totalGuardados = data['total_guardados'] as int? ?? 0;
-          final totalFallidos = data['total_fallidos'] as int? ?? 0;
-
-          debugPrint('✅ Respuesta del servidor:');
-          debugPrint('   - Guardados: $totalGuardados');
-          debugPrint('   - Fallidos: $totalFallidos');
-
-          // Completar con resultado
-          if (!_envioCompleter!.isCompleted) {
-            _envioCompleter!.complete({
-              'success': totalFallidos == 0,
-              'message': totalFallidos == 0
-                  ? 'Registros enviados exitosamente'
-                  : 'Algunos registros fallaron',
-              'total': totalGuardados,
-              'fallidos': totalFallidos,
-            });
-          }
-
-          // Cancelar suscripción
-          responseSubscription?.cancel();
-        }
-      });
-
-      // Enviar por WebSocket
-      _repository.sendWebSocketMessage(payload);
-
-      debugPrint('✅ Registros enviados por WebSocket, esperando respuesta...');
-
-      // Esperar respuesta con timeout de 10 segundos
-      debugPrint('⏳ Esperando respuesta del completer...');
-      final resultado = await _envioCompleter!.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('⏱️ Timeout esperando respuesta del servidor');
-          responseSubscription?.cancel();
-          return {
-            'success': false,
-            'message': 'Timeout: El servidor no respondió a tiempo',
-          };
-        },
-      );
-
-      debugPrint('📦 Resultado recibido del completer: $resultado');
-
-      // Si fue exitoso, marcar registros como sincronizados
+      // Si fue exitoso, marcar como completado
       if (resultado['success'] == true) {
-        debugPrint('✅ Marcando registros como sincronizados...');
-        for (final registro in registrosDB) {
-          try {
-            await _repository.marcarComoSincronizado(registro.idRegistro);
-          } catch (e) {
-            debugPrint('⚠️ Error marcando registro como sincronizado: $e');
-          }
-        }
-        debugPrint('✅ Todos los registros marcados como sincronizados');
+        debugPrint('✅ Registros enviados exitosamente');
         
-        // Marcar que los datos fueron enviados exitosamente
+        // Los registros ya fueron marcados como sincronizados en el SyncService
         _datosEnviados = true;
         
-        // AHORA SÍ detener el cronómetro y marcar como completado
+        // Detener el cronómetro y marcar como completado
         if (_stopwatch.isRunning) {
           _stopwatch.stop();
           _timer?.cancel();
@@ -934,13 +887,21 @@ class TimerProvider extends ChangeNotifier {
       }
 
       _isSyncing = false;
-      _envioCompleter = null;
       notifyListeners();
 
       debugPrint('🎉 Retornando resultado final: $resultado');
-      return resultado;
+      return {
+        'success': resultado['success'] ?? false,
+        'message': resultado['success'] == true 
+            ? 'Registros enviados exitosamente' 
+            : (resultado['errores']?.isNotEmpty == true 
+                ? resultado['errores'].first 
+                : 'Error al enviar registros'),
+        'total': resultado['exitosos'] ?? 0,
+        'fallidos': resultado['fallidos'] ?? 0,
+      };
     } catch (e, stackTrace) {
-      debugPrint('❌ ERROR CRÍTICO en enviarRegistrosPorWebSocket: $e');
+      debugPrint('❌ ERROR en enviarRegistrosPorHttp: $e');
       debugPrint('📍 Stack trace: $stackTrace');
       _isSyncing = false;
       notifyListeners();
