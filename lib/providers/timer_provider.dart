@@ -22,11 +22,16 @@ class TimerProvider extends ChangeNotifier {
   bool _datosEnviados = false;
   int _registrosPendientes = 0;
   StreamSubscription? _webSocketSubscription;
-  
+
+  // ========== PROTECCIÓN CONTRA OPERACIONES CONCURRENTES ==========
+  bool _isLoadingEquipo = false; // Bloqueo para setEquipo
+  bool _isLoadingRegistros = false; // Bloqueo para carga de registros
+  int? _equipoEnCarga; // ID del equipo siendo cargado
+
   // Sincronización con servidor
   DateTime? _serverStartedAt; // Timestamp de inicio desde el servidor
   DateTime? _serverFinishedAt; // Timestamp de finalización desde el servidor
-  
+
   int _tiempoInicioOffset =
       0; // Offset para sincronizar con hora real de inicio
   Completer<Map<String, dynamic>>?
@@ -56,6 +61,7 @@ class TimerProvider extends ChangeNotifier {
     // Fallback al stopwatch local (para compatibilidad)
     return _stopwatch.elapsedMilliseconds + _tiempoInicioOffset;
   }
+
   List<RegistroTiempo> get registros => List.unmodifiable(_registros);
   bool get isRunning => _stopwatch.isRunning;
   bool get isCompleted => _isCompleted;
@@ -121,39 +127,84 @@ class TimerProvider extends ChangeNotifier {
   }
 
   /// Establece el equipo actual y carga sus registros
+  /// PROTEGIDO contra llamadas concurrentes para evitar duplicación
   Future<void> setEquipo(Equipo equipo) async {
-    debugPrint('👥 Estableciendo equipo: ${equipo.nombre} (ID: ${equipo.id})');
-    _equipoActual = equipo;
-
-    // Verificar si el equipo ya tiene registros sincronizados
-    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
-    _datosEnviados = yaEnviado;
-    
-    if (yaEnviado) {
-      debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados previamente');
-    }
-
-    // Cargar registros desde BD local para continuar donde se quedó
-    await reloadRegistros();
-
-    debugPrint('   - Registros cargados desde BD: ${_registros.length}');
-    debugPrint('   - Datos enviados previamente: $_datosEnviados');
-
-    // Solo marcar como completado si los datos fueron enviados
-    // NO por tener 15 registros
-    if (_datosEnviados) {
-      _isCompleted = true;
-      debugPrint('   ✅ Equipo marcado como completado (datos ya enviados)');
-    } else if (_registros.length >= maxParticipantes) {
+    // ========== PROTECCIÓN CRÍTICA CONTRA LLAMADAS CONCURRENTES ==========
+    if (_isLoadingEquipo) {
       debugPrint(
-        '   ℹ️ Ya hay ${_registros.length} registros (máx: $maxParticipantes), pero aún no se han enviado',
+        '⚠️ BLOQUEADO setEquipo: Ya hay una carga de equipo en proceso',
       );
-      _isCompleted = false; // Permitir continuar hasta que se envíen
-    } else {
-      _isCompleted = false;
+      return;
     }
 
-    notifyListeners();
+    // Si es el mismo equipo que ya está cargado, verificar si ya terminó de cargar
+    if (_equipoEnCarga == equipo.id) {
+      debugPrint(
+        '⚠️ BLOQUEADO setEquipo: Equipo ${equipo.id} ya está siendo cargado',
+      );
+      return;
+    }
+
+    // Si ya es el equipo actual y ya cargó, no recargar innecesariamente
+    if (_equipoActual?.id == equipo.id &&
+        !_isLoadingEquipo &&
+        _registros.isNotEmpty) {
+      debugPrint(
+        'ℹ️ Equipo ${equipo.id} ya está cargado con ${_registros.length} registros',
+      );
+      return;
+    }
+
+    // Activar bloqueos
+    _isLoadingEquipo = true;
+    _equipoEnCarga = equipo.id;
+
+    debugPrint(
+      '🔒 Iniciando carga de equipo: ${equipo.nombre} (ID: ${equipo.id})',
+    );
+
+    try {
+      _equipoActual = equipo;
+
+      // Verificar si el equipo ya tiene registros sincronizados
+      final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(
+        equipo.id,
+      );
+      _datosEnviados = yaEnviado;
+
+      if (yaEnviado) {
+        debugPrint(
+          '   ⚠️ Este equipo ya tiene registros sincronizados previamente',
+        );
+      }
+
+      // Cargar registros desde BD local para continuar donde se quedó
+      await reloadRegistros();
+
+      debugPrint('   - Registros cargados desde BD: ${_registros.length}');
+      debugPrint('   - Datos enviados previamente: $_datosEnviados');
+
+      // Solo marcar como completado si los datos fueron enviados
+      // NO por tener 15 registros
+      if (_datosEnviados) {
+        _isCompleted = true;
+        debugPrint('   ✅ Equipo marcado como completado (datos ya enviados)');
+      } else if (_registros.length >= maxParticipantes) {
+        debugPrint(
+          '   ℹ️ Ya hay ${_registros.length} registros (máx: $maxParticipantes), pero aún no se han enviado',
+        );
+        _isCompleted = false; // Permitir continuar hasta que se envíen
+      } else {
+        _isCompleted = false;
+      }
+
+      notifyListeners();
+    } finally {
+      // SIEMPRE liberar bloqueos
+      _isLoadingEquipo = false;
+      _equipoEnCarga = null;
+      debugPrint('🔓 Carga de equipo completada');
+    }
   }
 
   /// Establece la competencia actual y configura el monitoreo
@@ -164,13 +215,15 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   - En curso: ${competencia.enCurso}');
     debugPrint('   - Activa: ${competencia.activa}');
     debugPrint('   - Fecha inicio: ${competencia.fechaInicio}');
-    
+
     _competenciaActual = competencia;
 
     // Si la competencia ya está en curso, sincronizar con el timestamp del servidor
     if (competencia.enCurso && competencia.fechaInicio != null) {
       _serverStartedAt = competencia.fechaInicio;
-      debugPrint('✅ Sincronizando con timestamp del servidor: $_serverStartedAt');
+      debugPrint(
+        '✅ Sincronizando con timestamp del servidor: $_serverStartedAt',
+      );
     }
 
     // IMPORTANTE: El cronómetro SOLO se inicia si competencia.enCurso == true
@@ -183,7 +236,9 @@ class TimerProvider extends ChangeNotifier {
       );
       start();
     } else if (!competencia.enCurso) {
-      debugPrint('⏸️ La competencia NO está en curso (isRunning=false) - Cronómetro en espera');
+      debugPrint(
+        '⏸️ La competencia NO está en curso (isRunning=false) - Cronómetro en espera',
+      );
       debugPrint('   ⚠️ Esperando mensaje WebSocket de inicio...');
     }
 
@@ -196,12 +251,14 @@ class TimerProvider extends ChangeNotifier {
     try {
       debugPrint('🔌 CONECTANDO WEBSOCKET para juez $juezId');
       if (_competenciaActual != null) {
-        debugPrint('   📊 Competencia cargada: ${_competenciaActual!.nombre} (ID: ${_competenciaActual!.id})');
+        debugPrint(
+          '   📊 Competencia cargada: ${_competenciaActual!.nombre} (ID: ${_competenciaActual!.id})',
+        );
         debugPrint('   📊 En curso: ${_competenciaActual!.enCurso}');
       } else {
         debugPrint('   ⚠️ No hay competencia cargada aún');
       }
-      
+
       await _repository.connectWebSocket(juezId);
 
       // Escuchar mensajes del WebSocket
@@ -224,41 +281,44 @@ class TimerProvider extends ChangeNotifier {
       if (message.type == WebSocketMessageType.pong) {
         return;
       }
-      
+
       debugPrint('📨 Mensaje WebSocket recibido en TimerProvider');
       debugPrint('📨 Tipo: ${message.type}');
       debugPrint('📨 Datos: ${message.data}');
-      
+
       switch (message.type) {
         case WebSocketMessageType.competenciaIniciada:
         case WebSocketMessageType.carreraIniciada:
           debugPrint('🏁 COMPETENCIA INICIADA - Iniciando cronómetro');
           _handleCarreraIniciada(message.data);
           break;
-          
+
         case WebSocketMessageType.competenciaDetenida:
         case WebSocketMessageType.carreraDetenida:
           debugPrint('🛑 COMPETENCIA DETENIDA - Pausando cronómetro');
           _handleCarreraDetenida(message.data);
           break;
-          
+
         case WebSocketMessageType.conexionEstablecida:
           debugPrint('✅ Conexión WebSocket establecida');
           // Si la competencia viene en curso, iniciar cronómetro
-          final competencia = message.data['competencia'] as Map<String, dynamic>?;
+          final competencia =
+              message.data['competencia'] as Map<String, dynamic>?;
           if (competencia != null) {
             final enCurso = competencia['en_curso'] as bool?;
             if (enCurso == true && !_stopwatch.isRunning) {
-              debugPrint('🏁 Competencia ya estaba en curso - Iniciando cronómetro');
+              debugPrint(
+                '🏁 Competencia ya estaba en curso - Iniciando cronómetro',
+              );
               _handleCarreraIniciada(competencia);
             }
           }
           break;
-          
+
         case WebSocketMessageType.pong:
           // Ignorar pong - es solo respuesta al heartbeat
           break;
-          
+
         default:
           debugPrint('Tipo de mensaje: ${message.type}');
       }
@@ -311,7 +371,7 @@ class TimerProvider extends ChangeNotifier {
     } else {
       debugPrint('⚠️ Cronómetro ya está corriendo o completado');
     }
-    
+
     // SIEMPRE notificar para disparar listeners (incluso si ya estaba corriendo)
     debugPrint('📢 Llamando notifyListeners() para propagar cambio...');
     notifyListeners();
@@ -329,7 +389,9 @@ class TimerProvider extends ChangeNotifier {
     if (finishedAtStr != null) {
       try {
         _serverFinishedAt = DateTime.parse(finishedAtStr);
-        debugPrint('✅ Timestamp de finalización del servidor recibido: $_serverFinishedAt');
+        debugPrint(
+          '✅ Timestamp de finalización del servidor recibido: $_serverFinishedAt',
+        );
       } catch (e) {
         debugPrint('⚠️ Error al parsear finished_at: $e');
       }
@@ -353,17 +415,11 @@ class TimerProvider extends ChangeNotifier {
     } else {
       debugPrint('⚠️ Cronómetro ya estaba pausado');
     }
-    
+
     // SIEMPRE notificar para disparar listeners
     debugPrint('📢 Llamando notifyListeners() para propagar cambio...');
     notifyListeners();
     debugPrint('✅ notifyListeners() ejecutado');
-  }
-
-  /// Maneja la actualización de competencia
-  void _handleCompetenciaActualizada(Map<String, dynamic>? data) {
-    debugPrint('Competencia actualizada: $data');
-    // Aquí podrías refrescar los datos de la competencia
   }
 
   /// Monitorea la hora de inicio de la competencia y sincronización automática
@@ -406,9 +462,11 @@ class TimerProvider extends ChangeNotifier {
         if (timer.tick % 10 == 0) {
           // Solo hacer polling si WebSocket está desconectado
           final isWebSocketConnected = _repository.isWebSocketConnected;
-          
+
           if (!isWebSocketConnected) {
-            debugPrint('Polling fallback: WebSocket desconectado, consultando API');
+            debugPrint(
+              'Polling fallback: WebSocket desconectado, consultando API',
+            );
             try {
               final competencia = await _repository.getCompetencia(
                 _competenciaActual!.id,
@@ -417,7 +475,9 @@ class TimerProvider extends ChangeNotifier {
               _competenciaActual = competencia;
 
               // Si la competencia está en curso y el cronómetro no está corriendo, iniciarlo
-              if (competencia.enCurso && !_stopwatch.isRunning && !_isCompleted) {
+              if (competencia.enCurso &&
+                  !_stopwatch.isRunning &&
+                  !_isCompleted) {
                 if (!anteriorEnCurso) {
                   debugPrint(
                     'Competencia cambió a EN CURSO - Iniciando cronómetro',
@@ -435,7 +495,9 @@ class TimerProvider extends ChangeNotifier {
           } else {
             // WebSocket conectado, no hacer polling
             if (timer.tick == 10) {
-              debugPrint('WebSocket activo: polling deshabilitado (usando actualizaciones en tiempo real)');
+              debugPrint(
+                'WebSocket activo: polling deshabilitado (usando actualizaciones en tiempo real)',
+              );
             }
           }
         }
@@ -505,21 +567,55 @@ class TimerProvider extends ChangeNotifier {
   }
 
   /// Carga los registros guardados para el equipo actual
+  /// PROTEGIDO contra llamadas concurrentes con Set para garantizar unicidad
   Future<void> _cargarRegistrosGuardados() async {
     if (_equipoActual == null) return;
 
+    // ========== PROTECCIÓN CONTRA CARGA CONCURRENTE ==========
+    if (_isLoadingRegistros) {
+      debugPrint(
+        '⚠️ BLOQUEADO _cargarRegistrosGuardados: Ya hay una carga en proceso',
+      );
+      return;
+    }
+
+    _isLoadingRegistros = true;
+    debugPrint(
+      '🔒 Iniciando carga de registros para equipo ${_equipoActual!.id}',
+    );
+
     try {
-      _registros.clear();
-      debugPrint('🔍 Consultando registros del equipo ${_equipoActual!.id} en BD...');
+      debugPrint(
+        '🔍 Consultando registros del equipo ${_equipoActual!.id} en BD...',
+      );
       final registrosGuardados = await _repository.getRegistrosByEquipo(
         _equipoActual!.id,
       );
-      debugPrint('   📊 Registros encontrados en BD: ${registrosGuardados.length}');
-      _registros.addAll(registrosGuardados);
+      debugPrint(
+        '   📊 Registros encontrados en BD: ${registrosGuardados.length}',
+      );
+
+      // LIMPIEZA ATÓMICA: Limpiar y agregar en una sola operación
+      _registros.clear();
+
+      // DEDUPLICACIÓN: Usar Set para garantizar unicidad por idRegistro
+      final Set<String> idsAgregados = {};
+      for (final registro in registrosGuardados) {
+        if (!idsAgregados.contains(registro.idRegistro)) {
+          _registros.add(registro);
+          idsAgregados.add(registro.idRegistro);
+        } else {
+          debugPrint(
+            '   ⚠️ Registro duplicado detectado y omitido: ${registro.idRegistro}',
+          );
+        }
+      }
 
       debugPrint('📋 Registros cargados en memoria: ${_registros.length}');
       if (_registros.isNotEmpty) {
-        debugPrint('   - Primer registro: ${_registros.first.tiempoFormateado}');
+        debugPrint(
+          '   - Primer registro: ${_registros.first.tiempoFormateado}',
+        );
         debugPrint('   - Último registro: ${_registros.last.tiempoFormateado}');
       }
 
@@ -527,8 +623,10 @@ class TimerProvider extends ChangeNotifier {
       // NO por tener 15 registros
       if (_datosEnviados) {
         _isCompleted = true;
-        debugPrint('   ✅ Competencia completada para este equipo (datos enviados)');
-        
+        debugPrint(
+          '   ✅ Competencia completada para este equipo (datos enviados)',
+        );
+
         // Si ya completó, detener el cronómetro si está corriendo
         if (_stopwatch.isRunning) {
           _stopwatch.stop();
@@ -553,8 +651,13 @@ class TimerProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error cargando registros: $e');
+    } finally {
+      // SIEMPRE liberar el bloqueo
+      _isLoadingRegistros = false;
+      debugPrint('🔓 Carga de registros completada');
     }
   }
+
   /// Actualiza el estado de sincronización
   Future<void> _updateSyncStatus() async {
     if (_equipoActual == null) return;
@@ -728,21 +831,25 @@ class TimerProvider extends ChangeNotifier {
     if (_datosEnviados) {
       debugPrint('⚠️ Los datos ya fueron enviados en esta sesión');
       return {
-        'success': false, 
-        'message': 'Los datos de este equipo ya fueron enviados al servidor', 
-        'yaEnviado': true
+        'success': false,
+        'message': 'Los datos de este equipo ya fueron enviados al servidor',
+        'yaEnviado': true,
       };
     }
 
     // Verificar en BD si el equipo ya tiene datos sincronizados
-    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(_equipoActual!.id);
+    final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(
+      _equipoActual!.id,
+    );
     if (yaEnviado) {
-      debugPrint('⚠️ Los datos ya fueron enviados anteriormente (verificado en BD)');
+      debugPrint(
+        '⚠️ Los datos ya fueron enviados anteriormente (verificado en BD)',
+      );
       _datosEnviados = true; // Actualizar flag local
       return {
-        'success': false, 
-        'message': 'Los datos de este equipo ya fueron enviados al servidor', 
-        'yaEnviado': true
+        'success': false,
+        'message': 'Los datos de este equipo ya fueron enviados al servidor',
+        'yaEnviado': true,
       };
     }
 
@@ -753,43 +860,57 @@ class TimerProvider extends ChangeNotifier {
 
     // CARGAR registros desde BD local para validación ANTES de iniciar sincronización
     debugPrint('📋 Validando registros desde BD local...');
-    final registrosDB = await _repository.getRegistrosByEquipo(_equipoActual!.id);
-    
+    final registrosDB = await _repository.getRegistrosByEquipo(
+      _equipoActual!.id,
+    );
+
     // VALIDACIÓN CRÍTICA 1: Verificar que hay exactamente 15 registros
     if (registrosDB.length != maxParticipantes) {
-      debugPrint('❌ VALIDACIÓN FALLIDA: Se requieren exactamente $maxParticipantes registros');
+      debugPrint(
+        '❌ VALIDACIÓN FALLIDA: Se requieren exactamente $maxParticipantes registros',
+      );
       debugPrint('   - Registros actuales: ${registrosDB.length}');
       return {
         'success': false,
-        'message': 'Se requieren exactamente $maxParticipantes registros. Tienes ${registrosDB.length}.',
+        'message':
+            'Se requieren exactamente $maxParticipantes registros. Tienes ${registrosDB.length}.',
       };
     }
-    
+
     // VALIDACIÓN CRÍTICA 2: Verificar que todos los registros pertenecen al equipo actual
-    final registrosInvalidos = registrosDB.where((r) => r.equipoId != _equipoActual!.id).toList();
+    final registrosInvalidos = registrosDB
+        .where((r) => r.equipoId != _equipoActual!.id)
+        .toList();
     if (registrosInvalidos.isNotEmpty) {
       debugPrint('❌ VALIDACIÓN FALLIDA: Hay registros de otro equipo');
       debugPrint('   - Registros inválidos: ${registrosInvalidos.length}');
       return {
         'success': false,
-        'message': 'Error de consistencia: Los registros no coinciden con el equipo actual',
+        'message':
+            'Error de consistencia: Los registros no coinciden con el equipo actual',
       };
     }
-    
+
     // VALIDACIÓN CRÍTICA 3: Verificar que ningún registro está ya sincronizado
-    final registrosSincronizados = registrosDB.where((r) => r.sincronizado).toList();
+    final registrosSincronizados = registrosDB
+        .where((r) => r.sincronizado)
+        .toList();
     if (registrosSincronizados.isNotEmpty) {
       debugPrint('❌ VALIDACIÓN FALLIDA: Hay registros ya sincronizados');
-      debugPrint('   - Registros sincronizados: ${registrosSincronizados.length}');
+      debugPrint(
+        '   - Registros sincronizados: ${registrosSincronizados.length}',
+      );
       _datosEnviados = true; // Marcar como enviados
       return {
         'success': false,
         'message': 'Los datos de este equipo ya fueron enviados al servidor',
-        'yaEnviado': true
+        'yaEnviado': true,
       };
     }
-    
-    debugPrint('✅ Validaciones pasadas: ${registrosDB.length} registros válidos');
+
+    debugPrint(
+      '✅ Validaciones pasadas: ${registrosDB.length} registros válidos',
+    );
 
     _isSyncing = true;
     notifyListeners();
@@ -814,15 +935,18 @@ class TimerProvider extends ChangeNotifier {
       debugPrint(
         '📤 Enviando ${registrosDB.length} registros por WebSocket...',
       );
-      
+
       // VALIDACIÓN FINAL: Verificar nuevamente antes de enviar
       if (registrosDB.length != maxParticipantes) {
         _isSyncing = false;
         notifyListeners();
-        debugPrint('❌ VALIDACIÓN FINAL FALLIDA: Cantidad incorrecta de registros');
+        debugPrint(
+          '❌ VALIDACIÓN FINAL FALLIDA: Cantidad incorrecta de registros',
+        );
         return {
           'success': false,
-          'message': 'Error: Se detectaron ${registrosDB.length} registros en lugar de $maxParticipantes',
+          'message':
+              'Error: Se detectaron ${registrosDB.length} registros en lugar de $maxParticipantes',
         };
       }
 
@@ -919,10 +1043,10 @@ class TimerProvider extends ChangeNotifier {
           }
         }
         debugPrint('✅ Todos los registros marcados como sincronizados');
-        
+
         // Marcar que los datos fueron enviados exitosamente
         _datosEnviados = true;
-        
+
         // AHORA SÍ detener el cronómetro y marcar como completado
         if (_stopwatch.isRunning) {
           _stopwatch.stop();
@@ -930,7 +1054,9 @@ class TimerProvider extends ChangeNotifier {
           debugPrint('⏸️ Cronómetro detenido tras envío exitoso');
         }
         _isCompleted = true;
-        debugPrint('✅ Proceso completado - datos enviados y cronómetro detenido');
+        debugPrint(
+          '✅ Proceso completado - datos enviados y cronómetro detenido',
+        );
       }
 
       _isSyncing = false;
@@ -1000,17 +1126,17 @@ class TimerProvider extends ChangeNotifier {
 
     notifyListeners();
   }
-  
+
   /// Limpia completamente el estado (usado en logout)
   void clearAll() {
     debugPrint('🧹 TimerProvider: Limpiando todo el estado (logout)');
-    
+
     // Detener cronómetro
     if (_stopwatch.isRunning) {
       _stopwatch.stop();
     }
     _stopwatch.reset();
-    
+
     // Cancelar todos los timers
     _timer?.cancel();
     _timer = null;
@@ -1018,11 +1144,11 @@ class TimerProvider extends ChangeNotifier {
     _checkTimer = null;
     _autoSyncTimer?.cancel();
     _autoSyncTimer = null;
-    
+
     // Cancelar suscripción WebSocket
     _webSocketSubscription?.cancel();
     _webSocketSubscription = null;
-    
+
     // Limpiar datos
     _registros.clear();
     _equipoActual = null;
@@ -1032,7 +1158,7 @@ class TimerProvider extends ChangeNotifier {
     _registrosPendientes = 0;
     _tiempoInicioOffset = 0;
     _envioCompleter = null;
-    
+
     notifyListeners();
   }
 

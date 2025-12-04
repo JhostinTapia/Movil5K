@@ -25,6 +25,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   TimerProvider? _timerProvider; // Referencia al provider
+  
+  // ========== PROTECCIÓN CONTRA MÚLTIPLES CLICS ==========
+  bool _isNavigating = false; // Bloqueo para evitar múltiples navegaciones
+  int? _equipoEnProceso; // ID del equipo que se está procesando
 
   @override
   void initState() {
@@ -341,6 +345,26 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
   }
 
   Future<void> _seleccionarEquipo(Equipo equipo, bool enCurso) async {
+    // ========== PROTECCIÓN CRÍTICA CONTRA MÚLTIPLES CLICS ==========
+    // Evita que múltiples presiones rápidas causen duplicación de registros
+    if (_isNavigating) {
+      debugPrint('⚠️ BLOQUEADO: Ya hay una navegación en proceso');
+      return;
+    }
+    
+    if (_equipoEnProceso == equipo.id) {
+      debugPrint('⚠️ BLOQUEADO: Este equipo ya está siendo procesado');
+      return;
+    }
+    
+    // Activar bloqueos
+    setState(() {
+      _isNavigating = true;
+      _equipoEnProceso = equipo.id;
+    });
+    
+    debugPrint('🔒 Navegación bloqueada - Procesando equipo ${equipo.id}');
+    
     // Buscar la competencia específica del equipo
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -350,34 +374,57 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         orElse: () => competencia!,
       );
       
-      if (!mounted) return;
+      if (!mounted) {
+        _liberarBloqueo();
+        return;
+      }
       
       // Verificar si el equipo ya tiene datos enviados
       final yaEnviado = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
       
+      if (!mounted) {
+        _liberarBloqueo();
+        return;
+      }
+      
       if (yaEnviado) {
         // Si ya envió datos, ir a pantalla de resultados
-        Navigator.pushNamed(
+        await Navigator.pushNamed(
           context,
           '/resultados',
           arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
         );
       } else {
         // Si no ha enviado, ir a pantalla de registro de tiempos
-        Navigator.pushNamed(
+        await Navigator.pushNamed(
           context,
           '/timer',
           arguments: {'equipo': equipo, 'competencia': competenciaDelEquipo},
         );
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cargar competencia: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar competencia: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    } finally {
+      // SIEMPRE liberar el bloqueo al terminar
+      _liberarBloqueo();
+    }
+  }
+  
+  /// Libera el bloqueo de navegación
+  void _liberarBloqueo() {
+    if (mounted) {
+      setState(() {
+        _isNavigating = false;
+        _equipoEnProceso = null;
+      });
+      debugPrint('🔓 Bloqueo de navegación liberado');
     }
   }
 
@@ -866,15 +913,22 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
-                      onTap: () => _seleccionarEquipo(equipo, enCurso),
-                      child: Container(
+                      // Deshabilitar tap si está navegando
+                      onTap: _isNavigating ? null : () => _seleccionarEquipo(equipo, enCurso),
+                      child: Stack(
+                        children: [
+                          // Contenido de la tarjeta
+                          Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.green.shade300,
-                            width: 2.5,
+                            // Cambiar borde si está procesando este equipo
+                            color: _equipoEnProceso == equipo.id 
+                                ? const Color(0xFF667eea)
+                                : Colors.green.shade300,
+                            width: _equipoEnProceso == equipo.id ? 3.5 : 2.5,
                           ),
                         ),
                         child: Row(
@@ -1047,7 +1101,19 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 color: gradient[0].withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(
+                              child: _equipoEnProceso == equipo.id
+                                  // Mostrar spinner si este equipo está cargando
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF667eea),
+                                        ),
+                                      ),
+                                    )
+                                  : Icon(
                                 Icons.arrow_forward_ios,
                                 color: gradient[0],
                                 size: 18,
@@ -1055,6 +1121,39 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                             ),
                           ],
                         ),
+                      ),
+                          // Overlay de carga cuando este equipo está siendo procesado
+                          if (_equipoEnProceso == equipo.id)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF667eea),
+                                        ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Text(
+                                        'Cargando...',
+                                        style: TextStyle(
+                                          color: Color(0xFF667eea),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

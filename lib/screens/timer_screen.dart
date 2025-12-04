@@ -20,11 +20,20 @@ class TimerScreen extends StatefulWidget {
 
 class _TimerScreenState extends State<TimerScreen> {
   StreamSubscription? _wsMessageSubscription;
+  bool _isInitialized = false; // Protección contra inicialización múltiple
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // ========== PROTECCIÓN CONTRA INICIALIZACIÓN MÚLTIPLE ==========
+      if (_isInitialized) {
+        debugPrint('⚠️ TimerScreen ya fue inicializado, ignorando llamada duplicada');
+        return;
+      }
+      _isInitialized = true;
+      debugPrint('🚀 Inicializando TimerScreen...');
+      
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
@@ -53,6 +62,8 @@ class _TimerScreenState extends State<TimerScreen> {
 
         // Escuchar mensajes del WebSocket (incluyendo errores)
         _subscribeToWebSocketMessages(timerProvider);
+        
+        debugPrint('✅ TimerScreen inicializado correctamente');
       }
     });
   }
@@ -1208,6 +1219,8 @@ class _TimerScreenState extends State<TimerScreen> {
   }
 
   void _mostrarMenuOpciones(BuildContext context) {
+    final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -1228,7 +1241,16 @@ class _TimerScreenState extends State<TimerScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              Text(
+                'Opciones',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 16),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
@@ -1237,18 +1259,18 @@ class _TimerScreenState extends State<TimerScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Icons.warning_amber_rounded,
+                    Icons.person_off,
                     color: Color(0xFFF57C00),
-                    size: 28,
+                    size: 24,
                   ),
                 ),
                 title: const Text(
-                  'Aplicar Penalización',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  'Registrar Jugadores Ausentes',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
-                subtitle: const Text(
-                  'Registrar jugadores ausentes (tiempo 00:00:00)',
-                  style: TextStyle(fontSize: 13),
+                subtitle: Text(
+                  'Agregar registros con tiempo 00:00:00 para jugadores que no participaron',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 trailing: const Icon(
                   Icons.chevron_right,
@@ -1259,7 +1281,20 @@ class _TimerScreenState extends State<TimerScreen> {
                   _mostrarDialogPenalizacion(context);
                 },
               ),
-              const SizedBox(height: 10),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: Colors.grey.shade500),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Registros: ${timerProvider.participantesRegistrados}/${TimerProvider.maxParticipantes}',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1401,45 +1436,14 @@ class _TimerScreenState extends State<TimerScreen> {
                             ),
                           ),
                         ),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () => _mostrarMenuOpciones(context),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.orange.withOpacity(0.5),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.warning_amber_rounded,
-                                    color: Colors.orange,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'Penal.',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        IconButton(
+                          onPressed: () => _mostrarMenuOpciones(context),
+                          icon: const Icon(
+                            Icons.more_vert,
+                            color: Colors.white,
+                            size: 26,
                           ),
+                          tooltip: 'Opciones',
                         ),
                       ],
                     ),
@@ -1539,6 +1543,46 @@ class _TimerScreenState extends State<TimerScreen> {
                                     ),
                             ),
                           ),
+                          // Mensaje cuando la competencia no ha iniciado
+                          if (!timerProvider.isRunning && !timerProvider.isCompleted)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.amber.shade200,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.hourglass_empty,
+                                      color: Colors.amber.shade700,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Flexible(
+                                      child: Text(
+                                        'Esperando inicio de la competencia...',
+                                        style: TextStyle(
+                                          color: Colors.amber.shade800,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
