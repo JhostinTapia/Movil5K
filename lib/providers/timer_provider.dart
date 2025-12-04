@@ -24,6 +24,11 @@ class TimerProvider extends ChangeNotifier {
   int _registrosPendientes = 0;
   StreamSubscription? _webSocketSubscription;
   
+  // ========== PROTECCIÓN CONTRA OPERACIONES CONCURRENTES ==========
+  bool _isLoadingEquipo = false; // Bloqueo para setEquipo
+  bool _isLoadingRegistros = false; // Bloqueo para carga de registros
+  int? _equipoEnCarga; // ID del equipo siendo cargado
+  
   // Sincronización con servidor
   DateTime? _serverStartedAt; // Timestamp de inicio desde el servidor
   DateTime? _serverFinishedAt; // Timestamp de finalización desde el servidor
@@ -132,69 +137,108 @@ class TimerProvider extends ChangeNotifier {
   }
 
   /// Establece el equipo actual y carga sus registros
-  /// Consulta al servidor para sincronizar registros si existen
+  /// PROTEGIDO contra llamadas concurrentes para evitar duplicación
   Future<void> setEquipo(Equipo equipo) async {
-    debugPrint('👥 Estableciendo equipo: ${equipo.nombre} (ID: ${equipo.id})');
-    
-    // IMPORTANTE: Resetear TODO el estado ANTES de cualquier operación
-    // Esto evita que la UI muestre estados residuales del equipo anterior
-    _datosEnviados = false;
-    _isCompleted = false;
-    _registros.clear();
-    _equipoActual = equipo;
-    
-    // Notificar inmediatamente para que la UI muestre estado limpio
-    notifyListeners();
-    debugPrint('   🧹 Estado reseteado: datosEnviados=false, isCompleted=false, registros=0');
-
-    // PASO 1: Consultar al servidor si el equipo ya tiene registros
-    // Esto es importante cuando el juez inicia sesión desde otro dispositivo
-    try {
-      debugPrint('   📡 Consultando registros en el servidor...');
-      final tieneEnServidor = await _repository.sincronizarRegistrosDesdeServidor(equipo.id);
-      
-      if (tieneEnServidor) {
-        debugPrint('   ✅ Registros encontrados en servidor y sincronizados');
-        _datosEnviados = true;
-      } else {
-        debugPrint('   📭 No hay registros en el servidor');
-      }
-    } catch (e) {
-      debugPrint('   ⚠️ No se pudo consultar servidor (offline?): $e');
-      // Continuar con BD local si no hay conexión
-    }
-
-    // PASO 2: Verificar en BD local si hay registros sincronizados
-    if (!_datosEnviados) {
-      final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
-      _datosEnviados = yaEnviado;
-      
-      if (yaEnviado) {
-        debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
-      }
-    }
-
-    // PASO 3: Cargar registros desde BD local
-    await reloadRegistros();
-
-    debugPrint('   - Registros cargados: ${_registros.length}');
-    debugPrint('   - Datos enviados: $_datosEnviados');
-
-    // Solo marcar como completado si los datos fueron enviados
-    if (_datosEnviados) {
-      _isCompleted = true;
-      debugPrint('   ✅ Equipo marcado como completado (datos ya enviados)');
-    } else if (_registros.length >= maxParticipantes) {
+    // ========== PROTECCIÓN CRÍTICA CONTRA LLAMADAS CONCURRENTES ==========
+    if (_isLoadingEquipo) {
       debugPrint(
-        '   ℹ️ Ya hay ${_registros.length} registros, pero aún no se han enviado',
+        '⚠️ BLOQUEADO setEquipo: Ya hay una carga de equipo en proceso',
       );
-      _isCompleted = false;
-    } else {
-      _isCompleted = false;
-      debugPrint('   📝 Equipo listo para registrar tiempos');
+      return;
     }
 
-    notifyListeners();
+    // Si es el mismo equipo que ya está cargado, verificar si ya terminó de cargar
+    if (_equipoEnCarga == equipo.id) {
+      debugPrint(
+        '⚠️ BLOQUEADO setEquipo: Equipo ${equipo.id} ya está siendo cargado',
+      );
+      return;
+    }
+
+    // Si ya es el equipo actual y ya cargó, no recargar innecesariamente
+    if (_equipoActual?.id == equipo.id &&
+        !_isLoadingEquipo &&
+        _registros.isNotEmpty) {
+      debugPrint(
+        'ℹ️ Equipo ${equipo.id} ya está cargado con ${_registros.length} registros',
+      );
+      return;
+    }
+
+    // Activar bloqueos
+    _isLoadingEquipo = true;
+    _equipoEnCarga = equipo.id;
+
+    debugPrint(
+      '🔒 Iniciando carga de equipo: ${equipo.nombre} (ID: ${equipo.id})',
+    );
+
+    try {
+      // IMPORTANTE: Resetear TODO el estado ANTES de cualquier operación
+      // Esto evita que la UI muestre estados residuales del equipo anterior
+      _datosEnviados = false;
+      _isCompleted = false;
+      _registros.clear();
+      _equipoActual = equipo;
+      
+      // Notificar inmediatamente para que la UI muestre estado limpio
+      notifyListeners();
+      debugPrint('   🧹 Estado reseteado: datosEnviados=false, isCompleted=false, registros=0');
+
+      // PASO 1: Consultar al servidor si el equipo ya tiene registros
+      // Esto es importante cuando el juez inicia sesión desde otro dispositivo
+      try {
+        debugPrint('   📡 Consultando registros en el servidor...');
+        final tieneEnServidor = await _repository.sincronizarRegistrosDesdeServidor(equipo.id);
+        
+        if (tieneEnServidor) {
+          debugPrint('   ✅ Registros encontrados en servidor y sincronizados');
+          _datosEnviados = true;
+        } else {
+          debugPrint('   📭 No hay registros en el servidor');
+        }
+      } catch (e) {
+        debugPrint('   ⚠️ No se pudo consultar servidor (offline?): $e');
+        // Continuar con BD local si no hay conexión
+      }
+
+      // PASO 2: Verificar en BD local si hay registros sincronizados
+      if (!_datosEnviados) {
+        final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
+        _datosEnviados = yaEnviado;
+        
+        if (yaEnviado) {
+          debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
+        }
+      }
+
+      // PASO 3: Cargar registros desde BD local
+      await reloadRegistros();
+
+      debugPrint('   - Registros cargados: ${_registros.length}');
+      debugPrint('   - Datos enviados: $_datosEnviados');
+
+      // Solo marcar como completado si los datos fueron enviados
+      if (_datosEnviados) {
+        _isCompleted = true;
+        debugPrint('   ✅ Equipo marcado como completado (datos ya enviados)');
+      } else if (_registros.length >= maxParticipantes) {
+        debugPrint(
+          '   ℹ️ Ya hay ${_registros.length} registros, pero aún no se han enviado',
+        );
+        _isCompleted = false;
+      } else {
+        _isCompleted = false;
+        debugPrint('   📝 Equipo listo para registrar tiempos');
+      }
+
+      notifyListeners();
+    } finally {
+      // SIEMPRE liberar bloqueos
+      _isLoadingEquipo = false;
+      _equipoEnCarga = null;
+      debugPrint('🔓 Carga de equipo completada');
+    }
   }
 
   /// Establece la competencia actual y configura el monitoreo
@@ -546,21 +590,55 @@ class TimerProvider extends ChangeNotifier {
   }
 
   /// Carga los registros guardados para el equipo actual
+  /// PROTEGIDO contra llamadas concurrentes con Set para garantizar unicidad
   Future<void> _cargarRegistrosGuardados() async {
     if (_equipoActual == null) return;
 
+    // ========== PROTECCIÓN CONTRA CARGA CONCURRENTE ==========
+    if (_isLoadingRegistros) {
+      debugPrint(
+        '⚠️ BLOQUEADO _cargarRegistrosGuardados: Ya hay una carga en proceso',
+      );
+      return;
+    }
+
+    _isLoadingRegistros = true;
+    debugPrint(
+      '🔒 Iniciando carga de registros para equipo ${_equipoActual!.id}',
+    );
+
     try {
-      _registros.clear();
-      debugPrint('🔍 Consultando registros del equipo ${_equipoActual!.id} en BD...');
+      debugPrint(
+        '🔍 Consultando registros del equipo ${_equipoActual!.id} en BD...',
+      );
       final registrosGuardados = await _repository.getRegistrosByEquipo(
         _equipoActual!.id,
       );
-      debugPrint('   📊 Registros encontrados en BD: ${registrosGuardados.length}');
-      _registros.addAll(registrosGuardados);
+      debugPrint(
+        '   📊 Registros encontrados en BD: ${registrosGuardados.length}',
+      );
+
+      // LIMPIEZA ATÓMICA: Limpiar y agregar en una sola operación
+      _registros.clear();
+
+      // DEDUPLICACIÓN: Usar Set para garantizar unicidad por idRegistro
+      final Set<String> idsAgregados = {};
+      for (final registro in registrosGuardados) {
+        if (!idsAgregados.contains(registro.idRegistro)) {
+          _registros.add(registro);
+          idsAgregados.add(registro.idRegistro);
+        } else {
+          debugPrint(
+            '   ⚠️ Registro duplicado detectado y omitido: ${registro.idRegistro}',
+          );
+        }
+      }
 
       debugPrint('📋 Registros cargados en memoria: ${_registros.length}');
       if (_registros.isNotEmpty) {
-        debugPrint('   - Primer registro: ${_registros.first.tiempoFormateado}');
+        debugPrint(
+          '   - Primer registro: ${_registros.first.tiempoFormateado}',
+        );
         debugPrint('   - Último registro: ${_registros.last.tiempoFormateado}');
       }
 
@@ -568,8 +646,10 @@ class TimerProvider extends ChangeNotifier {
       // NO por tener 15 registros
       if (_datosEnviados) {
         _isCompleted = true;
-        debugPrint('   ✅ Competencia completada para este equipo (datos enviados)');
-        
+        debugPrint(
+          '   ✅ Competencia completada para este equipo (datos enviados)',
+        );
+
         // Si ya completó, detener el cronómetro si está corriendo
         if (_stopwatch.isRunning) {
           _stopwatch.stop();
@@ -594,6 +674,10 @@ class TimerProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error cargando registros: $e');
+    } finally {
+      // SIEMPRE liberar el bloqueo
+      _isLoadingRegistros = false;
+      debugPrint('🔓 Carga de registros completada');
     }
   }
   /// Actualiza el estado de sincronización

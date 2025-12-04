@@ -20,11 +20,19 @@ class TimerScreen extends StatefulWidget {
 
 class _TimerScreenState extends State<TimerScreen> {
   StreamSubscription? _wsMessageSubscription;
+  bool _isInitialized = false; // Flag para evitar doble inicialización
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // ========== PROTECCIÓN CONTRA DOBLE INICIALIZACIÓN ==========
+      if (_isInitialized) {
+        debugPrint('⚠️ TimerScreen ya inicializado, ignorando...');
+        return;
+      }
+      _isInitialized = true;
+      
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
