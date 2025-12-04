@@ -250,12 +250,40 @@ class TimerProvider extends ChangeNotifier {
     debugPrint('   - Activa: ${competencia.activa}');
     debugPrint('   - Fecha inicio: ${competencia.fechaInicio}');
     
+    // ========== RESETEAR ESTADO ANTES DE CAMBIAR DE COMPETENCIA ==========
+    // Esto es CRÍTICO para evitar que el tiempo de una competencia
+    // se muestre en otra competencia diferente
+    if (_competenciaActual != null && _competenciaActual!.id != competencia.id) {
+      debugPrint('🔄 Cambiando de competencia ${_competenciaActual!.id} a ${competencia.id}');
+      debugPrint('   🧹 Reseteando estado del cronómetro...');
+      
+      // Detener el cronómetro si está corriendo
+      if (_stopwatch.isRunning) {
+        _stopwatch.stop();
+        _timer?.cancel();
+      }
+      
+      // Resetear el stopwatch
+      _stopwatch.reset();
+      
+      // Limpiar timestamps del servidor
+      _serverStartedAt = null;
+      _serverFinishedAt = null;
+      _tiempoInicioOffset = 0;
+      
+      debugPrint('   ✅ Estado reseteado: stopwatch=0, serverStartedAt=null');
+    }
+    
     _competenciaActual = competencia;
 
     // Si la competencia ya está en curso, sincronizar con el timestamp del servidor
     if (competencia.enCurso && competencia.fechaInicio != null) {
       _serverStartedAt = competencia.fechaInicio;
       debugPrint('✅ Sincronizando con timestamp del servidor: $_serverStartedAt');
+    } else {
+      // Si NO está en curso, asegurarse de que no hay timestamp
+      _serverStartedAt = null;
+      debugPrint('⏸️ Competencia no iniciada - sin timestamp de servidor');
     }
 
     // IMPORTANTE: El cronómetro SOLO se inicia si competencia.enCurso == true

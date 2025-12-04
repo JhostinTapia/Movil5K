@@ -92,27 +92,9 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       debugPrint('   - Estado actual: $estadoActual');
       
       // Guardar el nuevo estado
-      final estadoAnterior = _ultimoEstadoEnCurso;
       _ultimoEstadoEnCurso = estadoActual;
       
-      // Solo mostrar notificación si NO es la carga inicial y hubo cambio
-      if (!_isInitialLoad && estadoAnterior != null) {
-        debugPrint('   ✅ CAMBIO DE ESTADO CONFIRMADO');
-        
-        if (estadoActual) {
-          // La competencia acaba de iniciar
-          debugPrint('   🟢 Mostrando notificación: INICIADA');
-          _mostrarNotificacionCompetenciaIniciada(competenciaActual);
-        } else {
-          // La competencia se detuvo
-          debugPrint('   🔴 Mostrando notificación: DETENIDA');
-          _mostrarNotificacionCompetenciaDetenida(competenciaActual);
-        }
-      } else {
-        debugPrint('   ⏭️ No se muestra notificación (carga inicial)');
-      }
-      
-      // Siempre actualizar el estado local
+      // Actualizar el estado local (sin notificaciones)
       setState(() {
         competencia = competenciaActual;
         _isInitialLoad = false;
