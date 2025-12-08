@@ -164,9 +164,7 @@ class AppRepository {
   /// Obtiene todos los equipos (filtrados automáticamente por el juez autenticado en el servidor)
   Future<List<Equipo>> getEquipos({int? competenciaId}) async {
     try {
-      final data = await _apiService.getEquipos(
-        competenciaId: competenciaId,
-      );
+      final data = await _apiService.getEquipos(competenciaId: competenciaId);
       return data.map((json) => Equipo.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Error obteniendo equipos: $e');
@@ -197,16 +195,24 @@ class AppRepository {
   ) async {
     try {
       // VALIDACIÓN CRÍTICA: Verificar límite ANTES de guardar
-      final registrosActuales = await _databaseService.contarRegistrosEquipo(equipo.id);
-      
+      final registrosActuales = await _databaseService.contarRegistrosEquipo(
+        equipo.id,
+      );
+
       if (registrosActuales >= maxRegistrosPorEquipo) {
-        debugPrint('❌ LÍMITE ALCANZADO: Ya hay $registrosActuales registros para equipo ${equipo.id}');
-        debugPrint('   No se puede guardar más. Máximo permitido: $maxRegistrosPorEquipo');
+        debugPrint(
+          '❌ LÍMITE ALCANZADO: Ya hay $registrosActuales registros para equipo ${equipo.id}',
+        );
+        debugPrint(
+          '   No se puede guardar más. Máximo permitido: $maxRegistrosPorEquipo',
+        );
         return false; // No guardar, ya está lleno
       }
-      
+
       await _databaseService.insertRegistroTiempo(registro);
-      debugPrint('✅ Registro guardado: ${registrosActuales + 1}/$maxRegistrosPorEquipo');
+      debugPrint(
+        '✅ Registro guardado: ${registrosActuales + 1}/$maxRegistrosPorEquipo',
+      );
       return true;
     } catch (e) {
       debugPrint('Error guardando registro: $e');
@@ -294,7 +300,7 @@ class AppRepository {
   }
 
   /// Enviar registros por HTTP directamente
-  /// 
+  ///
   /// Este método envía los registros al servidor usando HTTP POST
   /// que es más confiable que WebSocket para envío de datos.
   Future<Map<String, dynamic>> enviarRegistrosPorHttp({
@@ -332,27 +338,27 @@ class AppRepository {
 
   /// Sincroniza registros desde el servidor a la BD local
   /// Retorna true si había registros en el servidor
+  ///
+  /// ⚠️ CRÍTICO: NUNCA borrar registros locales basándose en respuesta del servidor
+  /// porque errores de red, 404, timeouts podrían causar pérdida de datos.
   Future<bool> sincronizarRegistrosDesdeServidor(int equipoId) async {
     try {
       final estado = await _apiService.getEstadoRegistros(equipoId);
       final registrosServidor = estado['registros'] as List<dynamic>? ?? [];
-      
+
       if (registrosServidor.isEmpty) {
-        // IMPORTANTE: Si el servidor dice que NO hay registros,
-        // limpiar cualquier dato residual en la BD local
-        // Esto asegura consistencia servidor <-> cliente
-        final registrosLocales = await _databaseService.contarRegistrosEquipo(equipoId);
-        if (registrosLocales > 0) {
-          debugPrint('🧹 Servidor vacío pero BD local tiene $registrosLocales registros');
-          debugPrint('   Limpiando registros locales del equipo $equipoId...');
-          await _databaseService.eliminarRegistrosEquipo(equipoId);
-          debugPrint('   ✅ Registros locales eliminados');
-        }
+        // ⚠️ SEGURIDAD: NO borrar registros locales si el servidor responde vacío
+        // Esto podría ser un error de red, 404, o el endpoint no existe
+        // Los registros locales son la fuente de verdad hasta que se confirme el envío
+        debugPrint('📭 Servidor no reporta registros para equipo $equipoId');
+        debugPrint('   ⚠️ Manteniendo registros locales como fuente de verdad');
         return false;
       }
-      
-      debugPrint('📥 Sincronizando ${registrosServidor.length} registros desde servidor');
-      
+
+      debugPrint(
+        '📥 Sincronizando ${registrosServidor.length} registros desde servidor',
+      );
+
       // Guardar cada registro en la BD local (marcado como sincronizado)
       for (final regData in registrosServidor) {
         final registro = RegistroTiempo(
@@ -366,7 +372,7 @@ class AppRepository {
           timestamp: DateTime.now(),
           sincronizado: true, // Ya está en el servidor
         );
-        
+
         try {
           await _databaseService.insertRegistroTiempo(registro);
         } catch (e) {
@@ -374,11 +380,15 @@ class AppRepository {
           debugPrint('   Registro ${registro.idRegistro} ya existe localmente');
         }
       }
-      
-      debugPrint('✅ Registros sincronizados desde servidor: ${registrosServidor.length}');
+
+      debugPrint(
+        '✅ Registros sincronizados desde servidor: ${registrosServidor.length}',
+      );
       return true;
     } catch (e) {
-      debugPrint('Error sincronizando desde servidor: $e');
+      // ⚠️ CRÍTICO: Error de red NO debe afectar registros locales
+      debugPrint('⚠️ Error consultando servidor (offline/404?): $e');
+      debugPrint('   ✅ Registros locales preservados - sin cambios');
       return false;
     }
   }
