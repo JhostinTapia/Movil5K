@@ -10,6 +10,8 @@ class StorageService {
   static const String _keyRefreshToken = 'refresh_token';
   static const String _keyJuez = 'juez_data';
   static const String _keyLastSync = 'last_sync';
+  static const String _keyCacheCompetencias = 'cache_competencias_json';
+  static const String _keyCacheEquiposPrefix = 'cache_equipos_json_';
 
   /// Guardar tokens de autenticación
   Future<void> saveTokens(String accessToken, String refreshToken) async {
@@ -119,11 +121,51 @@ class StorageService {
     await prefs.remove(_keyRefreshToken);
     await prefs.remove(_keyJuez);
     await prefs.remove(_keyLastSync);
+    await prefs.remove(_keyCacheCompetencias);
+    // No es práctico enumerar todos los equipos cacheados aquí sin lista; se mantienen hasta logout limpio.
   }
 
   /// Verificar si hay una sesión activa
   Future<bool> hasActiveSession() async {
     final accessToken = await getAccessToken();
     return accessToken != null;
+  }
+
+  // ========= CACHÉ LIGERA (SharedPreferences) =========
+
+  Future<void> saveCompetenciasCache(List<Map<String, dynamic>> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyCacheCompetencias, json.encode(items));
+  }
+
+  Future<List<Map<String, dynamic>>?> getCompetenciasCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_keyCacheCompetencias);
+    if (cached == null) return null;
+    try {
+      final list = json.decode(cached) as List;
+      return list.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _equiposKey(int competenciaId) => '$_keyCacheEquiposPrefix$competenciaId';
+
+  Future<void> saveEquiposCache(int competenciaId, List<Map<String, dynamic>> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_equiposKey(competenciaId), json.encode(items));
+  }
+
+  Future<List<Map<String, dynamic>>?> getEquiposCache(int competenciaId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_equiposKey(competenciaId));
+    if (cached == null) return null;
+    try {
+      final list = json.decode(cached) as List;
+      return list.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return null;
+    }
   }
 }

@@ -135,15 +135,33 @@ class AppRepository {
   Future<List<Competencia>> getCompetencias({
     bool? activa,
     bool? enCurso,
+    bool forceRefresh = false,
   }) async {
     try {
+      if (!forceRefresh) {
+        final cached = await _storageService.getCompetenciasCache();
+        if (cached != null && cached.isNotEmpty) {
+          return cached.map((json) => Competencia.fromJson(json)).toList();
+        }
+      }
+
       final data = await _apiService.getCompetencias(
         activa: activa,
         enCurso: enCurso,
       );
-      return data.map((json) => Competencia.fromJson(json)).toList();
+      final list = data.map((json) => Competencia.fromJson(json)).toList();
+      // Guardar caché liviana para reabrir rápido/offline
+      await _storageService.saveCompetenciasCache(
+        list.map((c) => c.toJson()).toList(),
+      );
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo competencias: $e');
+      // Fallback a caché si existe
+      final cached = await _storageService.getCompetenciasCache();
+      if (cached != null && cached.isNotEmpty) {
+        return cached.map((json) => Competencia.fromJson(json)).toList();
+      }
       rethrow;
     }
   }
@@ -162,12 +180,34 @@ class AppRepository {
   // ==================== EQUIPOS ====================
 
   /// Obtiene todos los equipos (filtrados automáticamente por el juez autenticado en el servidor)
-  Future<List<Equipo>> getEquipos({int? competenciaId}) async {
+  Future<List<Equipo>> getEquipos({int? competenciaId, bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && competenciaId != null) {
+        final cached = await _storageService.getEquiposCache(competenciaId);
+        if (cached != null && cached.isNotEmpty) {
+          return cached.map((json) => Equipo.fromJson(json)).toList();
+        }
+      }
+
       final data = await _apiService.getEquipos(competenciaId: competenciaId);
-      return data.map((json) => Equipo.fromJson(json)).toList();
+      final list = data.map((json) => Equipo.fromJson(json)).toList();
+
+      if (competenciaId != null) {
+        await _storageService.saveEquiposCache(
+          competenciaId,
+          list.map((e) => e.toJson()).toList(),
+        );
+      }
+
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo equipos: $e');
+      if (competenciaId != null) {
+        final cached = await _storageService.getEquiposCache(competenciaId);
+        if (cached != null && cached.isNotEmpty) {
+          return cached.map((json) => Equipo.fromJson(json)).toList();
+        }
+      }
       rethrow;
     }
   }
@@ -326,71 +366,29 @@ class AppRepository {
     }
   }
 
-  /// Verificar estado de registros en el servidor
+  /// ⚠️ DEPRECADO: NO USAR
+  /// La fuente de verdad es SIEMPRE la BD local.
+  /// Los registros se CREAN localmente y se ENVÍAN al servidor.
+  /// NUNCA se obtienen registros desde el servidor.
+  @Deprecated('No usar - la fuente de verdad es siempre local. Ver getRegistrosByEquipo()')
   Future<Map<String, dynamic>> getEstadoRegistrosServidor(int equipoId) async {
-    try {
-      return await _apiService.getEstadoRegistros(equipoId);
-    } catch (e) {
-      debugPrint('Error obteniendo estado de registros del servidor: $e');
-      rethrow;
-    }
+    throw UnsupportedError(
+      'No se debe consultar el servidor para registros. '
+      'La fuente de verdad es la BD local. Usa getRegistrosByEquipo().'
+    );
   }
 
-  /// Sincroniza registros desde el servidor a la BD local
-  /// Retorna true si había registros en el servidor
-  ///
-  /// ⚠️ CRÍTICO: NUNCA borrar registros locales basándose en respuesta del servidor
-  /// porque errores de red, 404, timeouts podrían causar pérdida de datos.
+  /// ⚠️ DEPRECADO: NO USAR
+  /// La fuente de verdad es SIEMPRE la BD local.
+  /// Los registros se CREAN localmente y se ENVÍAN al servidor.
+  /// NUNCA se descargan registros desde el servidor.
+  @Deprecated('No usar - la fuente de verdad es siempre local')
   Future<bool> sincronizarRegistrosDesdeServidor(int equipoId) async {
-    try {
-      final estado = await _apiService.getEstadoRegistros(equipoId);
-      final registrosServidor = estado['registros'] as List<dynamic>? ?? [];
-
-      if (registrosServidor.isEmpty) {
-        // ⚠️ SEGURIDAD: NO borrar registros locales si el servidor responde vacío
-        // Esto podría ser un error de red, 404, o el endpoint no existe
-        // Los registros locales son la fuente de verdad hasta que se confirme el envío
-        debugPrint('📭 Servidor no reporta registros para equipo $equipoId');
-        debugPrint('   ⚠️ Manteniendo registros locales como fuente de verdad');
-        return false;
-      }
-
-      debugPrint(
-        '📥 Sincronizando ${registrosServidor.length} registros desde servidor',
-      );
-
-      // Guardar cada registro en la BD local (marcado como sincronizado)
-      for (final regData in registrosServidor) {
-        final registro = RegistroTiempo(
-          idRegistro: regData['id_registro'] ?? '',
-          equipoId: equipoId,
-          tiempo: regData['tiempo'] ?? 0,
-          horas: regData['horas'] ?? 0,
-          minutos: regData['minutos'] ?? 0,
-          segundos: regData['segundos'] ?? 0,
-          milisegundos: regData['milisegundos'] ?? 0,
-          timestamp: DateTime.now(),
-          sincronizado: true, // Ya está en el servidor
-        );
-
-        try {
-          await _databaseService.insertRegistroTiempo(registro);
-        } catch (e) {
-          // Si ya existe, ignorar (idempotencia)
-          debugPrint('   Registro ${registro.idRegistro} ya existe localmente');
-        }
-      }
-
-      debugPrint(
-        '✅ Registros sincronizados desde servidor: ${registrosServidor.length}',
-      );
-      return true;
-    } catch (e) {
-      // ⚠️ CRÍTICO: Error de red NO debe afectar registros locales
-      debugPrint('⚠️ Error consultando servidor (offline/404?): $e');
-      debugPrint('   ✅ Registros locales preservados - sin cambios');
-      return false;
-    }
+    throw UnsupportedError(
+      'No se debe sincronizar registros DESDE el servidor. '
+      'La fuente de verdad es la BD local. '
+      'Los registros se crean localmente y se envían al servidor con syncRegistros().'
+    );
   }
 
   /// Obtiene el estado de sincronización de un equipo
@@ -418,8 +416,17 @@ class AppRepository {
   // ==================== WEBSOCKET ====================
 
   /// Conecta al WebSocket para recibir notificaciones
+  /// Si ya hay una conexión activa, la cierra primero para evitar duplicados
   Future<void> connectWebSocket(int juezId) async {
     try {
+      // ========== CERRAR CONEXIÓN ANTERIOR SI EXISTE ==========
+      // Esto evita tener múltiples conexiones abiertas al mismo grupo
+      if (_webSocketService != null) {
+        debugPrint('🔄 Cerrando conexión WebSocket anterior antes de reconectar...');
+        await _webSocketService!.disconnect();
+        _webSocketService = null;
+      }
+      
       final accessToken = await _storageService.getAccessToken();
       if (accessToken == null) {
         throw Exception('No hay token de acceso');

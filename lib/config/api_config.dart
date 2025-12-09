@@ -51,8 +51,8 @@ class ApiConfig {
   }
 
   // Timeouts
-  static const Duration connectionTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 30);
+  static const Duration connectionTimeout = Duration(seconds: 10);
+  static const Duration receiveTimeout = Duration(seconds: 15);
 
   // Headers por defecto
   static Map<String, String> get defaultHeaders => {

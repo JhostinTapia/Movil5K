@@ -185,34 +185,17 @@ class TimerProvider extends ChangeNotifier {
       notifyListeners();
       debugPrint('   🧹 Estado reseteado: datosEnviados=false, isCompleted=false, registros=0');
 
-      // PASO 1: Consultar al servidor si el equipo ya tiene registros
-      // Esto es importante cuando el juez inicia sesión desde otro dispositivo
-      try {
-        debugPrint('   📡 Consultando registros en el servidor...');
-        final tieneEnServidor = await _repository.sincronizarRegistrosDesdeServidor(equipo.id);
-        
-        if (tieneEnServidor) {
-          debugPrint('   ✅ Registros encontrados en servidor y sincronizados');
-          _datosEnviados = true;
-        } else {
-          debugPrint('   📭 No hay registros en el servidor');
-        }
-      } catch (e) {
-        debugPrint('   ⚠️ No se pudo consultar servidor (offline?): $e');
-        // Continuar con BD local si no hay conexión
-      }
+      // PASO 1: Siempre cargar registros desde BD local (fuente de verdad offline-first)
+      // No se consulta al servidor para evitar carga innecesaria; el servidor solo recibe los 15 finales.
 
       // PASO 2: Verificar en BD local si hay registros sincronizados
-      if (!_datosEnviados) {
-        final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
-        _datosEnviados = yaEnviado;
-        
-        if (yaEnviado) {
-          debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
-        }
+      final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
+      _datosEnviados = yaEnviado;
+      if (yaEnviado) {
+        debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
       }
 
-      // PASO 3: Cargar registros desde BD local
+      // PASO 3: Cargar registros desde BD local SIEMPRE para mostrar rápido (offline-first)
       await reloadRegistros();
 
       debugPrint('   - Registros cargados: ${_registros.length}');
@@ -231,6 +214,8 @@ class TimerProvider extends ChangeNotifier {
         _isCompleted = false;
         debugPrint('   📝 Equipo listo para registrar tiempos');
       }
+
+      // Los registros locales son la fuente de verdad; no dependemos de consulta al servidor aquí.
 
       notifyListeners();
     } finally {
@@ -313,6 +298,14 @@ class TimerProvider extends ChangeNotifier {
         debugPrint('   📊 En curso: ${_competenciaActual!.enCurso}');
       } else {
         debugPrint('   ⚠️ No hay competencia cargada aún');
+      }
+      
+      // ========== CANCELAR SUSCRIPCIÓN ANTERIOR SI EXISTE ==========
+      // Esto evita recibir mensajes duplicados
+      if (_webSocketSubscription != null) {
+        debugPrint('   🔄 Cancelando suscripción WebSocket anterior...');
+        await _webSocketSubscription!.cancel();
+        _webSocketSubscription = null;
       }
       
       await _repository.connectWebSocket(juezId);
@@ -511,8 +504,12 @@ class TimerProvider extends ChangeNotifier {
           }
         }
 
-        // Notificar cambios para actualizar la UI del countdown
-        notifyListeners();
+        // OPTIMIZACIÓN: Solo notificar si el cronómetro NO está corriendo
+        // Cuando está corriendo, el timer de 10ms en start() ya notifica
+        // Esto reduce reconstrucciones innecesarias de la UI
+        if (!_stopwatch.isRunning) {
+          notifyListeners();
+        }
 
         // Refrescar competencia desde el servidor solo si WebSocket NO está conectado (fallback)
         // Cada 10 segundos como respaldo
@@ -568,9 +565,23 @@ class TimerProvider extends ChangeNotifier {
       debugPrint('▶️ Iniciando cronómetro...');
       debugPrint('   - Stopwatch corriendo antes: ${_stopwatch.isRunning}');
       debugPrint('   - Completado: $_isCompleted');
+      debugPrint('   - serverStartedAt: $_serverStartedAt');
 
-      // SINCRONIZAR con hora de inicio real de la competencia
-      if (_competenciaActual != null && _competenciaActual!.enCurso) {
+      // SINCRONIZAR con el timestamp REAL del servidor (started_at)
+      // Este es el momento exacto cuando el admin presionó "Iniciar"
+      if (_serverStartedAt != null) {
+        final ahora = DateTime.now();
+        final tiempoTranscurrido = ahora.difference(_serverStartedAt!);
+        _tiempoInicioOffset = tiempoTranscurrido.inMilliseconds;
+
+        debugPrint('⏰ Sincronizando cronómetro con started_at del servidor:');
+        debugPrint('   - started_at: $_serverStartedAt');
+        debugPrint('   - Hora actual: $ahora');
+        debugPrint(
+          '   - Tiempo transcurrido: ${_tiempoInicioOffset}ms (${(_tiempoInicioOffset / 1000 / 60).toStringAsFixed(2)} min)',
+        );
+      } else if (_competenciaActual != null && _competenciaActual!.enCurso) {
+        // Fallback: usar fechaHora programada si no hay started_at
         final ahora = DateTime.now();
         final horaInicio = _competenciaActual!.fechaHora;
 
@@ -579,8 +590,8 @@ class TimerProvider extends ChangeNotifier {
           final tiempoTranscurrido = ahora.difference(horaInicio);
           _tiempoInicioOffset = tiempoTranscurrido.inMilliseconds;
 
-          debugPrint('⏰ Sincronizando cronómetro con hora de inicio real:');
-          debugPrint('   - Hora inicio: $horaInicio');
+          debugPrint('⚠️ Fallback: Sincronizando con fechaHora programada:');
+          debugPrint('   - Hora inicio programada: $horaInicio');
           debugPrint('   - Hora actual: $ahora');
           debugPrint(
             '   - Tiempo transcurrido: ${_tiempoInicioOffset}ms (${(_tiempoInicioOffset / 1000 / 60).toStringAsFixed(2)} min)',
@@ -762,7 +773,8 @@ class TimerProvider extends ChangeNotifier {
     }
     
     _marcandoTiempo = true;
-    // NO llamar notifyListeners aquí para evitar parpadeo
+    // Notificar para que la UI deshabilite el botón visualmente
+    notifyListeners();
     
     try {
       debugPrint('🏁 marcarTiempo() llamado');
@@ -823,7 +835,8 @@ class TimerProvider extends ChangeNotifier {
       }
     } finally {
       _marcandoTiempo = false;
-      // NO llamar notifyListeners aquí - ya se llamó arriba si hubo cambios
+      // Notificar para rehabilitar el botón en la UI
+      notifyListeners();
     }
   }
 

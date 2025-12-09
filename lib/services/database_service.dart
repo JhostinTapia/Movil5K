@@ -57,36 +57,14 @@ class DatabaseService {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 4) {
-      // Recrear tabla completamente con columna penalizado
-
-      // 1. Eliminar tabla vieja
-      await db.execute('DROP TABLE IF EXISTS registros_tiempo');
-
-      // 2. Crear tabla nueva con esquema correcto
-      await db.execute('''
-        CREATE TABLE registros_tiempo (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          id_registro TEXT UNIQUE NOT NULL,
-          equipo_id INTEGER NOT NULL,
-          tiempo INTEGER NOT NULL,
-          timestamp TEXT NOT NULL,
-          horas INTEGER DEFAULT 0,
-          minutos INTEGER DEFAULT 0,
-          segundos INTEGER DEFAULT 0,
-          milisegundos INTEGER DEFAULT 0,
-          sincronizado INTEGER DEFAULT 0,
-          penalizado INTEGER DEFAULT 0
-        )
-      ''');
-
-      // 3. Recrear índices
-      await db.execute('''
-        CREATE INDEX idx_equipo_id ON registros_tiempo(equipo_id)
-      ''');
-
-      await db.execute('''
-        CREATE INDEX idx_sincronizado ON registros_tiempo(sincronizado)
-      ''');
+      // Migración no destructiva: agregar columna penalizado si no existe
+      try {
+        await db.execute('ALTER TABLE registros_tiempo ADD COLUMN penalizado INTEGER DEFAULT 0');
+      } catch (_) {
+        // si ya existe, ignorar
+      }
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_equipo_id ON registros_tiempo(equipo_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_sincronizado ON registros_tiempo(sincronizado)');
     }
   }
 

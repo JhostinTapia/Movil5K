@@ -40,8 +40,26 @@ class _TimerScreenState extends State<TimerScreen> {
           context,
           listen: false,
         );
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final equipo = args['equipo'] as Equipo;
-        final competencia = args['competencia'] as Competencia?;
+        final competenciaArg = args['competencia'] as Competencia?;
+
+        // ========== OBTENER COMPETENCIA FRESCA DEL SERVIDOR ==========
+        // Siempre obtener la competencia actualizada del servidor para tener
+        // el started_at correcto y sincronizar el cronómetro apropiadamente
+        Competencia? competencia = competenciaArg;
+        if (competenciaArg != null) {
+          try {
+            debugPrint('🔄 Obteniendo competencia fresca del servidor (ID: ${competenciaArg.id})...');
+            competencia = await authProvider.repository.getCompetencia(competenciaArg.id);
+            debugPrint('✅ Competencia obtenida: ${competencia.nombre}');
+            debugPrint('   - En curso: ${competencia.enCurso}');
+            debugPrint('   - started_at: ${competencia.fechaInicio}');
+          } catch (e) {
+            debugPrint('⚠️ No se pudo obtener competencia del servidor, usando cache: $e');
+            competencia = competenciaArg; // Fallback al cache
+          }
+        }
 
         // Primero establecer la competencia para que el cronómetro
         // se sincronice correctamente con el estado de ESTA competencia
@@ -53,7 +71,6 @@ class _TimerScreenState extends State<TimerScreen> {
         await timerProvider.setEquipo(equipo);
 
         // Conectar el TimerProvider al WebSocket
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
         if (authProvider.juez != null) {
           timerProvider.connectWebSocket(authProvider.juez!.id);
           debugPrint('🔌 TimerProvider conectado al WebSocket');
@@ -1844,19 +1861,25 @@ class _TimerScreenState extends State<TimerScreen> {
                   const SizedBox(height: 12),
 
                   // Botón marcar tiempo
+                  // Se deshabilita cuando:
+                  // 1. Ya hay una operación de marcado en curso (marcandoTiempo)
+                  // 2. Ya se alcanzó el límite de 15 registros (!canAddMore)
+                  // 3. Los datos ya fueron enviados (datosEnviados)
                   if (timerProvider.isRunning && timerProvider.canAddMore)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                          gradient: LinearGradient(
+                            colors: timerProvider.marcandoTiempo 
+                              ? [Colors.grey.shade400, Colors.grey.shade500]
+                              : [const Color(0xFF667eea), const Color(0xFF764ba2)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
+                          boxShadow: timerProvider.marcandoTiempo ? [] : [
                             BoxShadow(
                               color: const Color(0xFF667eea).withOpacity(0.4),
                               blurRadius: 15,
@@ -1865,25 +1888,36 @@ class _TimerScreenState extends State<TimerScreen> {
                           ],
                         ),
                         child: ElevatedButton(
-                          onPressed: timerProvider.marcarTiempo,
+                          // CRÍTICO: Deshabilitar si hay operación en curso
+                          onPressed: timerProvider.marcandoTiempo 
+                            ? null 
+                            : timerProvider.marcarTiempo,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
                             foregroundColor: Colors.white,
+                            disabledForegroundColor: Colors.white70,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),
                             elevation: 0,
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(FontAwesomeIcons.flag, size: 20),
-                              SizedBox(width: 12),
+                              Icon(
+                                timerProvider.marcandoTiempo 
+                                  ? FontAwesomeIcons.spinner 
+                                  : FontAwesomeIcons.flag, 
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
                               Text(
-                                'MARCAR TIEMPO',
-                                style: TextStyle(
+                                timerProvider.marcandoTiempo 
+                                  ? 'GUARDANDO...' 
+                                  : 'MARCAR TIEMPO',
+                                style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.2,

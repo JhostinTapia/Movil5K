@@ -1,5 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import '../config/api_config.dart';
 import 'storage_service.dart';
 
@@ -21,8 +26,18 @@ class ApiService {
   final StorageService _storageService;
 
   ApiService({http.Client? client, StorageService? storageService})
-    : _client = client ?? http.Client(),
+    : _client = client ?? _buildClient(),
       _storageService = storageService ?? StorageService();
+
+  /// Construye un cliente HTTP con keep-alive y más conexiones por host (solo móvil).
+  static http.Client _buildClient() {
+    if (kIsWeb) return http.Client();
+    final ioClient = HttpClient()
+      ..idleTimeout = const Duration(seconds: 15)
+      ..maxConnectionsPerHost = 12
+      ..connectionTimeout = ApiConfig.connectionTimeout;
+    return IOClient(ioClient);
+  }
 
   /// Obtiene headers autenticados con el token JWT
   Future<Map<String, String>> _getAuthHeaders({
@@ -61,10 +76,7 @@ class ApiService {
           ? await _getAuthHeaders(extraHeaders: headers)
           : headers ?? ApiConfig.defaultHeaders;
 
-      final response = await _client
-          .get(uri, headers: requestHeaders)
-          .timeout(ApiConfig.connectionTimeout);
-
+      final response = await _sendWithRetry(() => _client.get(uri, headers: requestHeaders));
       return _handleResponse(response);
     } catch (e) {
       final error = _handleError(e);
@@ -99,14 +111,11 @@ class ApiService {
           ? await _getAuthHeaders(extraHeaders: headers)
           : headers ?? ApiConfig.defaultHeaders;
 
-      final response = await _client
-          .post(
-            uri,
-            headers: requestHeaders,
-            body: body != null ? json.encode(body) : null,
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
+      final response = await _sendWithRetry(() => _client.post(
+        uri,
+        headers: requestHeaders,
+        body: body != null ? json.encode(body) : null,
+      ));
       return _handleResponse(response);
     } catch (e) {
       final error = _handleError(e);
@@ -141,14 +150,11 @@ class ApiService {
           ? await _getAuthHeaders(extraHeaders: headers)
           : headers ?? ApiConfig.defaultHeaders;
 
-      final response = await _client
-          .put(
-            uri,
-            headers: requestHeaders,
-            body: body != null ? json.encode(body) : null,
-          )
-          .timeout(ApiConfig.connectionTimeout);
-
+      final response = await _sendWithRetry(() => _client.put(
+        uri,
+        headers: requestHeaders,
+        body: body != null ? json.encode(body) : null,
+      ));
       return _handleResponse(response);
     } catch (e) {
       final error = _handleError(e);
@@ -182,10 +188,7 @@ class ApiService {
           ? await _getAuthHeaders(extraHeaders: headers)
           : headers ?? ApiConfig.defaultHeaders;
 
-      final response = await _client
-          .delete(uri, headers: requestHeaders)
-          .timeout(ApiConfig.connectionTimeout);
-
+      final response = await _sendWithRetry(() => _client.delete(uri, headers: requestHeaders));
       return _handleResponse(response);
     } catch (e) {
       final error = _handleError(e);
@@ -202,6 +205,40 @@ class ApiService {
       
       throw error;
     }
+  }
+
+  // -------- Resiliencia y backoff --------
+
+  Future<http.Response> _sendWithRetry(Future<http.Response> Function() send) async {
+    const maxRetries = 2; // total 3 intentos
+    int attempt = 0;
+    while (true) {
+      try {
+        final resp = await send().timeout(ApiConfig.receiveTimeout);
+        if (_isRetriableStatus(resp.statusCode) && attempt < maxRetries) {
+          await _delayBackoff(attempt);
+          attempt++;
+          continue;
+        }
+        return resp;
+      } on TimeoutException {
+        if (attempt >= maxRetries) rethrow;
+        await _delayBackoff(attempt);
+        attempt++;
+      } on SocketException {
+        if (attempt >= maxRetries) rethrow;
+        await _delayBackoff(attempt);
+        attempt++;
+      }
+    }
+  }
+
+  bool _isRetriableStatus(int code) => code == 429 || code == 502 || code == 503 || code == 504;
+
+  Future<void> _delayBackoff(int attempt) async {
+    final base = pow(2, attempt).toInt();
+    final jitterMs = Random().nextInt(200);
+    await Future.delayed(Duration(milliseconds: 400 * base + jitterMs));
   }
 
   /// Maneja la respuesta HTTP
@@ -433,11 +470,16 @@ class ApiService {
     );
   }
 
-  /// Verificar estado de registros de un equipo
-  /// 
-  /// Returns: {"puede_enviar": true/false, "total_registros": 0, ...}
+  /// ⚠️ DEPRECADO: NO USAR
+  /// La fuente de verdad es SIEMPRE la BD local.
+  /// Los registros se CREAN localmente y se ENVÍAN al servidor.
+  /// NUNCA se consulta el servidor para obtener registros.
+  @Deprecated('No usar - la fuente de verdad es siempre la BD local')
   Future<Map<String, dynamic>> getEstadoRegistros(int equipoId) async {
-    return await get('/api/equipos/$equipoId/registros/estado/');
+    throw UnsupportedError(
+      'No se debe consultar el servidor para registros. '
+      'La fuente de verdad es la BD local.'
+    );
   }
 
   /// Liberar recursos
