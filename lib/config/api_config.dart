@@ -1,16 +1,59 @@
 import 'package:flutter/foundation.dart';
 
 /// Configuración centralizada de la API
+/// 
+/// Para producción, cambia [_productionUrl] a tu dominio real.
+/// La app detecta automáticamente si está en modo desarrollo o producción.
 class ApiConfig {
-  // URL base del servidor - Automático según plataforma
-  static const String baseUrl = kIsWeb
-      ? 'http://127.0.0.1:8000' // Para navegador web
-      // : 'http://192.168.0.190:8000'; // Para móvil (IP WiFi de tu laptop)
-      : 'http://192.168.0.108:8000'; // Para móvil (IP WiFi de tu laptop)
-  // : 'http://10.20.142:8000'; // Para móvil (IP WiFi de tu laptop)
+  // ============================================================================
+  // CONFIGURACIÓN DE PRODUCCIÓN - CAMBIA ESTO ANTES DE DESPLEGAR
+  // ============================================================================
+  
+  /// URL del servidor en producción (dominio o IP pública)
+  /// Ejemplos:
+  ///   - 'https://api.midominio.com'
+  ///   - 'http://server5k.example.com:8000'
+  ///   - 'http://203.0.113.50:8000' (IP pública)
+  static const String _productionUrl = 'http://TU_DOMINIO_O_IP:8000';
+  
+  /// URL del servidor en desarrollo (IP local de tu laptop)
+  static const String _developmentUrl = 'http://192.168.0.190:8000';
+  
+  /// URL para emulador Android (10.0.2.2 = localhost del host)
+  static const String _emulatorUrl = 'http://10.0.2.2:8000';
+  
+  /// URL para navegador web (localhost)
+  static const String _webUrl = 'http://127.0.0.1:8000';
+  
+  // ============================================================================
+  // SELECCIÓN DE ENTORNO
+  // ============================================================================
+  
+  /// Cambiar a `true` para usar la URL de producción
+  static const bool isProduction = false;
+  
+  /// Cambiar a `true` si estás probando en emulador Android
+  static const bool isEmulator = false;
 
-  // static const String baseUrl = 'http://10.0.2.2:8000'; // Para emulador Android
-  // static const String baseUrl = 'http://192.168.x.x:8000'; // Para otro dispositivo físico
+  // ============================================================================
+  // URL BASE - NO MODIFICAR (se calcula automáticamente)
+  // ============================================================================
+  
+  static String get baseUrl {
+    if (kIsWeb) {
+      return _webUrl;
+    }
+    
+    if (isProduction) {
+      return _productionUrl;
+    }
+    
+    if (isEmulator) {
+      return _emulatorUrl;
+    }
+    
+    return _developmentUrl;
+  }
 
   // Endpoints de autenticación
   static const String loginEndpoint = '/api/login/';
@@ -23,7 +66,13 @@ class ApiConfig {
   static const String equiposEndpoint = '/api/equipos/';
 
   // WebSocket
-  static String get wsBaseUrl => baseUrl.replaceFirst('http', 'ws');
+  static String get wsBaseUrl {
+    final url = baseUrl;
+    if (url.startsWith('https://')) {
+      return url.replaceFirst('https://', 'wss://');
+    }
+    return url.replaceFirst('http://', 'ws://');
+  }
 
   static String webSocketUrl(int juezId, String token) {
     // Limpiar el token de caracteres extras AGRESIVAMENTE
@@ -64,4 +113,15 @@ class ApiConfig {
     ...defaultHeaders,
     'Authorization': 'Bearer $token',
   };
+  
+  /// Muestra la configuración actual (para debug)
+  static void printConfig() {
+    debugPrint('═══════════════════════════════════════════════');
+    debugPrint('📡 API Config:');
+    debugPrint('   Base URL: $baseUrl');
+    debugPrint('   WS URL: $wsBaseUrl');
+    debugPrint('   Modo: ${isProduction ? "PRODUCCIÓN" : "DESARROLLO"}');
+    debugPrint('   Emulador: $isEmulator');
+    debugPrint('═══════════════════════════════════════════════');
+  }
 }

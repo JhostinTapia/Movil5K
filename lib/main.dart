@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'config/api_config.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/timer_provider.dart';
@@ -13,6 +14,9 @@ import 'screens/resultados_equipo_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Mostrar configuración de API al iniciar (debug)
+  ApiConfig.printConfig();
 
   // Inicializar sqflite_ffi para Windows, Linux y macOS
   if (Platform.isWindows || Platform.isLinux) {

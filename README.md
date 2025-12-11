@@ -8,7 +8,7 @@
 
 **Sistema de Registro de Tiempos para Árbitros**
 
-*Universidad Nacional de Loja - Carrera Atlética 5 km*
+_Universidad Nacional de Loja - Carrera Atlética 5 km_
 
 [Características](#-características) • [Instalación](#-instalación) • [Documentación](#-documentación) • [Uso](#-uso)
 
@@ -28,35 +28,36 @@ La app funciona de manera **autónoma** sin conexión a Internet, guardando los 
 
 ### 🎯 Funcionalidad Principal
 
-- ✅ **Cronómetro de alta precisión** (milisegundos)
-- ✅ **Registro con un solo botón** al cruce de meta
-- ✅ **Límite automático** de 15 participantes por equipo
-- ✅ **Detención automática** al completar 15 registros
-- ✅ **Lista en tiempo real** de todos los tiempos marcados
-- ✅ **Persistencia local** de datos (offline-first)
-- ✅ **Sincronización automática** cuando hay conexión
+-   ✅ **Cronómetro de alta precisión** (milisegundos)
+-   ✅ **Registro con un solo botón** al cruce de meta
+-   ✅ **Límite automático** de 15 participantes por equipo
+-   ✅ **Detención automática** al completar 15 registros
+-   ✅ **Lista en tiempo real** de todos los tiempos marcados
+-   ✅ **Persistencia local** de datos (offline-first)
+-   ✅ **Sincronización automática** cuando hay conexión
 
 ### 🎨 Interfaz de Usuario
 
-- ✅ Diseño moderno y deportivo
-- ✅ Indicadores visuales de estado (Detenido/En Curso/Completado)
-- ✅ Medallas para top 3 participantes (🥇🥈🥉)
-- ✅ Animaciones sutiles y fluidas
-- ✅ Tema de colores coherente y profesional
+-   ✅ Diseño moderno y deportivo
+-   ✅ Indicadores visuales de estado (Detenido/En Curso/Completado)
+-   ✅ Medallas para top 3 participantes (🥇🥈🥉)
+-   ✅ Animaciones sutiles y fluidas
+-   ✅ Tema de colores coherente y profesional
 
 ### 🔧 Funciones Adicionales
 
-- ✅ Autenticación de jueces
-- ✅ Gestión de equipos asignados
-- ✅ Eliminación de registros erróneos
-- ✅ Reset con confirmación
-- ✅ Menú de opciones avanzadas
+-   ✅ Autenticación de jueces
+-   ✅ Gestión de equipos asignados
+-   ✅ Eliminación de registros erróneos
+-   ✅ Reset con confirmación
+-   ✅ Menú de opciones avanzadas
 
 ---
 
 ## 📱 Capturas
 
 ### Login Screen
+
 ```
 ┌─────────────────────────┐
 │    [Logo Carrera 5K]    │
@@ -70,6 +71,7 @@ La app funciona de manera **autónoma** sin conexión a Internet, guardando los 
 ```
 
 ### Timer Screen
+
 ```
 ┌─────────────────────────┐
 │ Dorsal 101              │
@@ -95,10 +97,10 @@ La app funciona de manera **autónoma** sin conexión a Internet, guardando los 
 
 ### Requisitos Previos
 
-- Flutter SDK ≥ 3.8.1
-- Dart SDK ≥ 3.8.1
-- Android Studio / VS Code
-- Dispositivo Android o Emulador
+-   Flutter SDK ≥ 3.8.1
+-   Dart SDK ≥ 3.8.1
+-   Android Studio / VS Code
+-   Dispositivo Android o Emulador
 
 ### Pasos
 
@@ -122,14 +124,14 @@ flutter build apk --release
 
 ## 📖 Documentación
 
-| Documento | Descripción |
-|-----------|-------------|
-| **[RESUMEN.md](RESUMEN.md)** | Visión general del proyecto completo |
-| **[DOC_APP.md](DOC_APP.md)** | Documentación técnica detallada |
-| **[GUIA_USO.md](GUIA_USO.md)** | Manual de usuario para jueces |
-| **[GUIA_VISUAL.md](GUIA_VISUAL.md)** | Diseño UI/UX y mockups |
-| **[INTEGRACION_BACKEND.md](INTEGRACION_BACKEND.md)** | Guía de integración con Django |
-| **[INICIO_RAPIDO.md](INICIO_RAPIDO.md)** | Comenzar en 5 minutos |
+| Documento                                            | Descripción                          |
+| ---------------------------------------------------- | ------------------------------------ |
+| **[RESUMEN.md](RESUMEN.md)**                         | Visión general del proyecto completo |
+| **[DOC_APP.md](DOC_APP.md)**                         | Documentación técnica detallada      |
+| **[GUIA_USO.md](GUIA_USO.md)**                       | Manual de usuario para jueces        |
+| **[GUIA_VISUAL.md](GUIA_VISUAL.md)**                 | Diseño UI/UX y mockups               |
+| **[INTEGRACION_BACKEND.md](INTEGRACION_BACKEND.md)** | Guía de integración con Django       |
+| **[INICIO_RAPIDO.md](INICIO_RAPIDO.md)**             | Comenzar en 5 minutos                |
 
 ---
 
@@ -178,26 +180,49 @@ lib/
 
 ### Tecnologías
 
-- **Framework**: Flutter 3.32.8
-- **Lenguaje**: Dart 3.8.1
-- **Estado**: Provider
-- **Storage**: SharedPreferences
-- **HTTP**: http package
-- **IDs**: UUID
-- **Animaciones**: flutter_animate
+-   **Framework**: Flutter 3.32.8
+-   **Lenguaje**: Dart 3.8.1
+-   **Estado**: Provider
+-   **Storage**: SharedPreferences
+-   **HTTP**: http package
+-   **IDs**: UUID
+-   **Animaciones**: flutter_animate
 
 ---
 
 ## 🔗 Integración con Backend
 
-La app está diseñada para conectarse con el servidor Django ubicado en `Server5K-main/`.
+La app está diseñada para conectarse con el servidor Django ubicado en `Server5K/`.
+
+### Configuración del Servidor (IMPORTANTE)
+
+Antes de compilar la app para producción, debes configurar la URL del servidor en `lib/config/api_config.dart`:
+
+```dart
+// Para producción, cambia estos valores:
+static const String _productionUrl = 'http://TU_DOMINIO_O_IP:8000';
+static const bool isProduction = true;  // Cambiar a true
+```
+
+**Ejemplos de URLs de producción:**
+
+-   `http://api.midominio.com:8000` (HTTP con dominio)
+-   `https://api.midominio.com` (HTTPS con dominio)
+-   `http://203.0.113.50:8000` (HTTP con IP pública)
+
+**Para desarrollo local:**
+
+```dart
+static const bool isProduction = false;  // Usa _developmentUrl
+static const String _developmentUrl = 'http://192.168.0.190:8000';  // Tu IP local
+```
 
 ### Modelos Compatibles
 
-- ✅ Competencia
-- ✅ Juez
-- ✅ Equipo
-- ✅ RegistroTiempo
+-   ✅ Competencia
+-   ✅ Juez
+-   ✅ Equipo
+-   ✅ RegistroTiempo
 
 ### Endpoints Esperados
 
@@ -250,15 +275,15 @@ flutter test --coverage
 
 ```yaml
 dependencies:
-  flutter:
-    sdk: flutter
-  provider: ^6.1.1              # State management
-  shared_preferences: ^2.2.2    # Local storage
-  http: ^1.2.0                  # HTTP requests
-  uuid: ^4.3.3                  # UUID generation
-  intl: ^0.19.0                 # Date formatting
-  flutter_animate: ^4.5.0       # Animations
-  font_awesome_flutter: ^10.7.0 # Icons
+    flutter:
+        sdk: flutter
+    provider: ^6.1.1 # State management
+    shared_preferences: ^2.2.2 # Local storage
+    http: ^1.2.0 # HTTP requests
+    uuid: ^4.3.3 # UUID generation
+    intl: ^0.19.0 # Date formatting
+    flutter_animate: ^4.5.0 # Animations
+    font_awesome_flutter: ^10.7.0 # Icons
 ```
 
 ---
@@ -266,6 +291,7 @@ dependencies:
 ## 🐛 Solución de Problemas
 
 ### La app no compila
+
 ```bash
 flutter clean
 flutter pub get
@@ -273,6 +299,7 @@ flutter run
 ```
 
 ### No se ven los cambios
+
 ```bash
 # Hot reload
 Presiona 'r'
@@ -282,6 +309,7 @@ Presiona 'R'
 ```
 
 ### Error de dependencias
+
 ```bash
 flutter pub upgrade
 ```
@@ -292,14 +320,14 @@ flutter pub upgrade
 
 ## 📋 Checklist Pre-Evento
 
-- [ ] Instalar app en todos los dispositivos
-- [ ] Verificar permisos de almacenamiento
-- [ ] Probar cronómetro y marcación
-- [ ] Configurar red WiFi local
-- [ ] Verificar IP del servidor
-- [ ] Hacer backup de APK
-- [ ] Cargar completamente las baterías
-- [ ] Hacer prueba end-to-end
+-   [ ] Instalar app en todos los dispositivos
+-   [ ] Verificar permisos de almacenamiento
+-   [ ] Probar cronómetro y marcación
+-   [ ] Configurar red WiFi local
+-   [ ] Verificar IP del servidor
+-   [ ] Hacer backup de APK
+-   [ ] Cargar completamente las baterías
+-   [ ] Hacer prueba end-to-end
 
 ---
 
@@ -308,6 +336,7 @@ flutter pub upgrade
 Este proyecto es de uso exclusivo para la Universidad Nacional de Loja.
 
 Para modificaciones:
+
 1. Clonar el repositorio
 2. Crear una rama: `git checkout -b feature/nueva-funcionalidad`
 3. Commit cambios: `git commit -am 'Agregar funcionalidad'`
@@ -319,8 +348,9 @@ Para modificaciones:
 ## 👥 Equipo
 
 **Desarrollado para:**
-- Universidad Nacional de Loja
-- Carrera de Pedagogía de la Actividad Física y Deporte
+
+-   Universidad Nacional de Loja
+-   Carrera de Pedagogía de la Actividad Física y Deporte
 
 ---
 
@@ -333,8 +363,9 @@ Para modificaciones:
 ## 📞 Soporte
 
 Para soporte técnico durante el evento:
-- Ver documentación en carpeta del proyecto
-- Contactar al coordinador técnico
+
+-   Ver documentación en carpeta del proyecto
+-   Contactar al coordinador técnico
 
 ---
 
