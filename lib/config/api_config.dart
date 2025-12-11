@@ -14,16 +14,16 @@ class ApiConfig {
   ///   - 'https://api.midominio.com'
   ///   - 'http://server5k.example.com:8000'
   ///   - 'http://203.0.113.50:8000' (IP pública)
-  static const String _productionUrl = 'http://TU_DOMINIO_O_IP:8000';
+  static const String _productionUrl = 'http://TU_DOMINIO_O_IP:80';
   
   /// URL del servidor en desarrollo (IP local de tu laptop)
-  static const String _developmentUrl = 'http://192.168.0.190:8000';
+  static const String _developmentUrl = 'http://192.168.0.108:80';
   
   /// URL para emulador Android (10.0.2.2 = localhost del host)
-  static const String _emulatorUrl = 'http://10.0.2.2:8000';
+  static const String _emulatorUrl = 'http://10.0.2.2:80';
   
   /// URL para navegador web (localhost)
-  static const String _webUrl = 'http://127.0.0.1:8000';
+  static const String _webUrl = 'http://127.0.0.1:80';
   
   // ============================================================================
   // SELECCIÓN DE ENTORNO
