@@ -470,17 +470,9 @@ class ApiService {
     );
   }
 
-  /// ⚠️ DEPRECADO: NO USAR
-  /// La fuente de verdad es SIEMPRE la BD local.
-  /// Los registros se CREAN localmente y se ENVÍAN al servidor.
-  /// NUNCA se consulta el servidor para obtener registros.
-  @Deprecated('No usar - la fuente de verdad es siempre la BD local')
-  Future<Map<String, dynamic>> getEstadoRegistros(int equipoId) async {
-    throw UnsupportedError(
-      'No se debe consultar el servidor para registros. '
-      'La fuente de verdad es la BD local.'
-    );
-  }
+  // NOTA: La app móvil es la FUENTE DE VERDAD para registros.
+  // No se consulta ni descarga registros del servidor.
+  // Solo se envían registros AL servidor.
 
   /// Liberar recursos
   void dispose() {

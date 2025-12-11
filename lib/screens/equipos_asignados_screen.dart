@@ -238,10 +238,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
 
       // Cargar TODOS los equipos asignados al juez (sin filtrar)
       final todosLosEquipos = await authProvider.repository.getEquipos();
-
-      // Los registros se cargan SOLO desde la BD local
-      // La fuente de verdad es SIEMPRE local, NUNCA el servidor
-      debugPrint('📦 Cargando ${todosLosEquipos.length} equipos desde BD local');
+      debugPrint('✅ ${todosLosEquipos.length} equipos cargados');
 
       setState(() {
         equiposAsignados = todosLosEquipos; // Todos los equipos, sin filtrar
@@ -359,11 +356,9 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         orElse: () => competencia!,
       );
       
-      // La fuente de verdad es SIEMPRE la BD local
-      // NUNCA se consulta el servidor para obtener registros
+      // Verificar SOLO en BD local si hay registros sincronizados
       final tieneRegistros = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
-      
-      debugPrint('📊 Estado equipo ${equipo.nombre}: tieneRegistros=$tieneRegistros (fuente: BD local)');
+      debugPrint('📊 Estado equipo ${equipo.nombre}: tieneRegistros=$tieneRegistros (BD local)');
       
       if (!mounted) {
         _liberarBloqueo();

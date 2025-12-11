@@ -185,17 +185,16 @@ class TimerProvider extends ChangeNotifier {
       notifyListeners();
       debugPrint('   🧹 Estado reseteado: datosEnviados=false, isCompleted=false, registros=0');
 
-      // PASO 1: Siempre cargar registros desde BD local (fuente de verdad offline-first)
-      // No se consulta al servidor para evitar carga innecesaria; el servidor solo recibe los 15 finales.
-
-      // PASO 2: Verificar en BD local si hay registros sincronizados
+      // Verificar SOLO en BD local si hay registros sincronizados
+      // La app móvil es la fuente de verdad - NUNCA consulta registros del servidor
       final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
       _datosEnviados = yaEnviado;
+      
       if (yaEnviado) {
-        debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
+        debugPrint('   ✅ Registros ya sincronizados (BD local)');
       }
 
-      // PASO 3: Cargar registros desde BD local SIEMPRE para mostrar rápido (offline-first)
+      // Cargar registros desde BD local
       await reloadRegistros();
 
       debugPrint('   - Registros cargados: ${_registros.length}');

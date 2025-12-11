@@ -366,30 +366,10 @@ class AppRepository {
     }
   }
 
-  /// ⚠️ DEPRECADO: NO USAR
-  /// La fuente de verdad es SIEMPRE la BD local.
-  /// Los registros se CREAN localmente y se ENVÍAN al servidor.
-  /// NUNCA se obtienen registros desde el servidor.
-  @Deprecated('No usar - la fuente de verdad es siempre local. Ver getRegistrosByEquipo()')
-  Future<Map<String, dynamic>> getEstadoRegistrosServidor(int equipoId) async {
-    throw UnsupportedError(
-      'No se debe consultar el servidor para registros. '
-      'La fuente de verdad es la BD local. Usa getRegistrosByEquipo().'
-    );
-  }
-
-  /// ⚠️ DEPRECADO: NO USAR
-  /// La fuente de verdad es SIEMPRE la BD local.
-  /// Los registros se CREAN localmente y se ENVÍAN al servidor.
-  /// NUNCA se descargan registros desde el servidor.
-  @Deprecated('No usar - la fuente de verdad es siempre local')
-  Future<bool> sincronizarRegistrosDesdeServidor(int equipoId) async {
-    throw UnsupportedError(
-      'No se debe sincronizar registros DESDE el servidor. '
-      'La fuente de verdad es la BD local. '
-      'Los registros se crean localmente y se envían al servidor con syncRegistros().'
-    );
-  }
+  // ==================== NOTA: La app móvil es la FUENTE DE VERDAD ====================
+  // Los registros se guardan localmente y se envían al servidor.
+  // NUNCA se descargan registros del servidor a la app.
+  // Esto evita problemas de sincronización y pérdida de datos.
 
   /// Obtiene el estado de sincronización de un equipo
   Future<Map<String, dynamic>> getSyncStatus({required int equipoId}) async {
