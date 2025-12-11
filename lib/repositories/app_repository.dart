@@ -326,72 +326,10 @@ class AppRepository {
     }
   }
 
-  /// Verificar estado de registros en el servidor
-  Future<Map<String, dynamic>> getEstadoRegistrosServidor(int equipoId) async {
-    try {
-      return await _apiService.getEstadoRegistros(equipoId);
-    } catch (e) {
-      debugPrint('Error obteniendo estado de registros del servidor: $e');
-      rethrow;
-    }
-  }
-
-  /// Sincroniza registros desde el servidor a la BD local
-  /// Retorna true si había registros en el servidor
-  ///
-  /// ⚠️ CRÍTICO: NUNCA borrar registros locales basándose en respuesta del servidor
-  /// porque errores de red, 404, timeouts podrían causar pérdida de datos.
-  Future<bool> sincronizarRegistrosDesdeServidor(int equipoId) async {
-    try {
-      final estado = await _apiService.getEstadoRegistros(equipoId);
-      final registrosServidor = estado['registros'] as List<dynamic>? ?? [];
-
-      if (registrosServidor.isEmpty) {
-        // ⚠️ SEGURIDAD: NO borrar registros locales si el servidor responde vacío
-        // Esto podría ser un error de red, 404, o el endpoint no existe
-        // Los registros locales son la fuente de verdad hasta que se confirme el envío
-        debugPrint('📭 Servidor no reporta registros para equipo $equipoId');
-        debugPrint('   ⚠️ Manteniendo registros locales como fuente de verdad');
-        return false;
-      }
-
-      debugPrint(
-        '📥 Sincronizando ${registrosServidor.length} registros desde servidor',
-      );
-
-      // Guardar cada registro en la BD local (marcado como sincronizado)
-      for (final regData in registrosServidor) {
-        final registro = RegistroTiempo(
-          idRegistro: regData['id_registro'] ?? '',
-          equipoId: equipoId,
-          tiempo: regData['tiempo'] ?? 0,
-          horas: regData['horas'] ?? 0,
-          minutos: regData['minutos'] ?? 0,
-          segundos: regData['segundos'] ?? 0,
-          milisegundos: regData['milisegundos'] ?? 0,
-          timestamp: DateTime.now(),
-          sincronizado: true, // Ya está en el servidor
-        );
-
-        try {
-          await _databaseService.insertRegistroTiempo(registro);
-        } catch (e) {
-          // Si ya existe, ignorar (idempotencia)
-          debugPrint('   Registro ${registro.idRegistro} ya existe localmente');
-        }
-      }
-
-      debugPrint(
-        '✅ Registros sincronizados desde servidor: ${registrosServidor.length}',
-      );
-      return true;
-    } catch (e) {
-      // ⚠️ CRÍTICO: Error de red NO debe afectar registros locales
-      debugPrint('⚠️ Error consultando servidor (offline/404?): $e');
-      debugPrint('   ✅ Registros locales preservados - sin cambios');
-      return false;
-    }
-  }
+  // ==================== NOTA: La app móvil es la FUENTE DE VERDAD ====================
+  // Los registros se guardan localmente y se envían al servidor.
+  // NUNCA se descargan registros del servidor a la app.
+  // Esto evita problemas de sincronización y pérdida de datos.
 
   /// Obtiene el estado de sincronización de un equipo
   Future<Map<String, dynamic>> getSyncStatus({required int equipoId}) async {

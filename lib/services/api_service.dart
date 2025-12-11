@@ -433,12 +433,9 @@ class ApiService {
     );
   }
 
-  /// Verificar estado de registros de un equipo
-  /// 
-  /// Returns: {"puede_enviar": true/false, "total_registros": 0, ...}
-  Future<Map<String, dynamic>> getEstadoRegistros(int equipoId) async {
-    return await get('/api/equipos/$equipoId/registros/estado/');
-  }
+  // NOTA: La app móvil es la FUENTE DE VERDAD para registros.
+  // No se consulta ni descarga registros del servidor.
+  // Solo se envían registros AL servidor.
 
   /// Liberar recursos
   void dispose() {

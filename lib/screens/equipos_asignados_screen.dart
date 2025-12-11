@@ -238,19 +238,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
 
       // Cargar TODOS los equipos asignados al juez (sin filtrar)
       final todosLosEquipos = await authProvider.repository.getEquipos();
-
-      // SINCRONIZAR registros de cada equipo con el servidor
-      // Esto asegura que los badges muestren el estado correcto
-      debugPrint('📡 Sincronizando registros de ${todosLosEquipos.length} equipos...');
-      for (final equipo in todosLosEquipos) {
-        try {
-          await authProvider.repository.sincronizarRegistrosDesdeServidor(equipo.id);
-        } catch (e) {
-          // Ignorar errores de sincronización individual
-          debugPrint('   ⚠️ Error sincronizando equipo ${equipo.id}: $e');
-        }
-      }
-      debugPrint('✅ Sincronización de equipos completada');
+      debugPrint('✅ ${todosLosEquipos.length} equipos cargados');
 
       setState(() {
         equiposAsignados = todosLosEquipos; // Todos los equipos, sin filtrar
@@ -368,24 +356,9 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
         orElse: () => competencia!,
       );
       
-      // IMPORTANTE: Sincronizar desde el servidor PRIMERO
-      // Esto descarga los registros si existen en el servidor (otro dispositivo)
-      bool tieneEnServidor = false;
-      try {
-        tieneEnServidor = await authProvider.repository.sincronizarRegistrosDesdeServidor(equipo.id);
-        debugPrint('📡 Sincronización servidor: tieneRegistros=$tieneEnServidor');
-      } catch (e) {
-        debugPrint('⚠️ No se pudo sincronizar con servidor: $e');
-        // Continuar con verificación local si no hay conexión
-      }
-      
-      // Verificar en BD local (puede tener datos de sincronización anterior o del servidor)
-      final yaEnviadoLocal = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
-      
-      // El equipo tiene datos si: servidor dice que sí O BD local dice que sí
-      final tieneRegistros = tieneEnServidor || yaEnviadoLocal;
-      
-      debugPrint('📊 Estado equipo ${equipo.nombre}: servidor=$tieneEnServidor, local=$yaEnviadoLocal, final=$tieneRegistros');
+      // Verificar SOLO en BD local si hay registros sincronizados
+      final tieneRegistros = await authProvider.repository.equipoTieneRegistrosSincronizados(equipo.id);
+      debugPrint('📊 Estado equipo ${equipo.nombre}: tieneRegistros=$tieneRegistros (BD local)');
       
       if (!mounted) {
         _liberarBloqueo();

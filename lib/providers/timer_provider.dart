@@ -185,34 +185,16 @@ class TimerProvider extends ChangeNotifier {
       notifyListeners();
       debugPrint('   🧹 Estado reseteado: datosEnviados=false, isCompleted=false, registros=0');
 
-      // PASO 1: Consultar al servidor si el equipo ya tiene registros
-      // Esto es importante cuando el juez inicia sesión desde otro dispositivo
-      try {
-        debugPrint('   📡 Consultando registros en el servidor...');
-        final tieneEnServidor = await _repository.sincronizarRegistrosDesdeServidor(equipo.id);
-        
-        if (tieneEnServidor) {
-          debugPrint('   ✅ Registros encontrados en servidor y sincronizados');
-          _datosEnviados = true;
-        } else {
-          debugPrint('   📭 No hay registros en el servidor');
-        }
-      } catch (e) {
-        debugPrint('   ⚠️ No se pudo consultar servidor (offline?): $e');
-        // Continuar con BD local si no hay conexión
+      // Verificar SOLO en BD local si hay registros sincronizados
+      // La app móvil es la fuente de verdad - NUNCA consulta registros del servidor
+      final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
+      _datosEnviados = yaEnviado;
+      
+      if (yaEnviado) {
+        debugPrint('   ✅ Registros ya sincronizados (BD local)');
       }
 
-      // PASO 2: Verificar en BD local si hay registros sincronizados
-      if (!_datosEnviados) {
-        final yaEnviado = await _repository.equipoTieneRegistrosSincronizados(equipo.id);
-        _datosEnviados = yaEnviado;
-        
-        if (yaEnviado) {
-          debugPrint('   ⚠️ Este equipo ya tiene registros sincronizados en BD local');
-        }
-      }
-
-      // PASO 3: Cargar registros desde BD local
+      // Cargar registros desde BD local
       await reloadRegistros();
 
       debugPrint('   - Registros cargados: ${_registros.length}');
