@@ -437,7 +437,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFBF0811), Color(0xFF418E3A), Color(0xFF004C7B)],
+            colors: [Color(0xFF004C7B), Color(0xFF0066A1), Color(0xFF004C7B)],
           ),
         ),
         child: Stack(
@@ -579,7 +579,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                 ),
                                 child: const Icon(
                                   Icons.person,
-                                  color: Color(0xFFBF0811),
+                                  color: Color(0xFF004C7B),
                                   size: 32,
                                 ),
                               ),
@@ -627,7 +627,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+                              colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
                             ),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -643,7 +643,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFBF0811),
+                            color: Color(0xFF004C7B),
                           ),
                         ),
                         const Spacer(),
@@ -655,7 +655,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                             ),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+                                colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -683,12 +683,12 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                   Expanded(
                     child: RefreshIndicator(
                       onRefresh: _cargarEquipos,
-                      color: const Color(0xFFBF0811),
+                      color: const Color(0xFF004C7B),
                       child: isLoading
                           ? const Center(
                               child: CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  Color(0xFFBF0811),
+                                  Color(0xFF004C7B),
                                 ),
                               ),
                             )
@@ -708,10 +708,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                           gradient: LinearGradient(
                                             colors: [
                                               const Color(
-                                                0xFFBF0811,
+                                                0xFF004C7B,
                                               ).withOpacity(0.1),
                                               const Color(
-                                                0xFF418E3A,
+                                                0xFF0066A1,
                                               ).withOpacity(0.1),
                                             ],
                                           ),
@@ -773,10 +773,10 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
 
   Widget _buildEquipoCard(Equipo equipo, int index) {
     final gradientColors = [
-      [const Color(0xFFBF0811), const Color(0xFF418E3A)],
-      [const Color(0xFF418E3A), const Color(0xFF648F39)],
-      [const Color(0xFF004C7B), const Color(0xFF418E3A)],
-      [const Color(0xFFBF0811), const Color(0xFF004C7B)],
+      [const Color(0xFF004C7B), const Color(0xFF0066A1)],
+      [const Color(0xFF0066A1), const Color(0xFF003557)],
+      [const Color(0xFF004C7B), const Color(0xFF0066A1)],
+      [const Color(0xFF004C7B), const Color(0xFF004C7B)],
     ];
 
     final gradient = gradientColors[index % gradientColors.length];
@@ -835,7 +835,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+                          colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -914,7 +914,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                             border: Border.all(
                               // Cambiar borde si está procesando este equipo
                               color: _equipoEnProceso == equipo.id
-                                  ? const Color(0xFFBF0811)
+                                  ? const Color(0xFF004C7B)
                                   : Colors.green.shade300,
                               width: _equipoEnProceso == equipo.id ? 3.5 : 2.5,
                             ),
@@ -1121,7 +1121,7 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                           strokeWidth: 2,
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                                Color(0xFFBF0811),
+                                                Color(0xFF004C7B),
                                               ),
                                         ),
                                       )
@@ -1148,14 +1148,14 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                                   children: [
                                     CircularProgressIndicator(
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFFBF0811),
+                                        Color(0xFF004C7B),
                                       ),
                                     ),
                                     SizedBox(height: 12),
                                     Text(
                                       'Cargando...',
                                       style: TextStyle(
-                                        color: Color(0xFFBF0811),
+                                        color: Color(0xFF004C7B),
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
