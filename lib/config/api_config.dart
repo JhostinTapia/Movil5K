@@ -14,7 +14,7 @@ class ApiConfig {
   ///   - 'https://api.midominio.com'
   ///   - 'http://server5k.example.com:8000'
   ///   - 'http://203.0.113.50:8000' (IP pública)
-  static const String _productionUrl = 'http://TU_DOMINIO_O_IP:80';
+ static const String _productionUrl = 'https://activate.unl.edu.ec';
   
   /// URL del servidor en desarrollo (IP local de tu laptop)
   static const String _developmentUrl = 'http://192.168.0.108:80';
@@ -30,7 +30,7 @@ class ApiConfig {
   // ============================================================================
   
   /// Cambiar a `true` para usar la URL de producción
-  static const bool isProduction = false;
+  static const bool isProduction = true;
   
   /// Cambiar a `true` si estás probando en emulador Android
   static const bool isEmulator = false;
