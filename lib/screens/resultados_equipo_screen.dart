@@ -92,7 +92,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+                colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
               ),
             ),
             child: SafeArea(
@@ -255,7 +255,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                 label: 'Participantes',
                                 valor:
                                     '${estadisticas['totalParticipantes']}/15',
-                                color: const Color(0xFFBF0811),
+                                color: const Color(0xFF004C7B),
                               ),
                               Container(
                                 width: 1,
@@ -398,7 +398,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                               children: [
                                 const Icon(
                                   FontAwesomeIcons.clockRotateLeft,
-                                  color: Color(0xFFBF0811),
+                                  color: Color(0xFF004C7B),
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
@@ -419,8 +419,8 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [
-                                        Color(0xFFBF0811),
-                                        Color(0xFF418E3A),
+                                        Color(0xFF004C7B),
+                                        Color(0xFF0066A1),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(12),

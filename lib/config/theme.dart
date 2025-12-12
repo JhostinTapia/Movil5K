@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Colores corporativos Universidad Nacional de Loja
-  static const Color primaryColor = Color(0xFFBF0811); // Rojo UNL
-  static const Color secondaryColor = Color(0xFF418E3A); // Verde UNL
-  static const Color accentColor = Color(0xFF004C7B); // Azul UNL
-  static const Color errorColor = Color(0xFFBF0811); // Rojo UNL
+  // Color principal - Azul UNL
+  static const Color primaryColor = Color(0xFF004C7B); // Azul UNL
+  static const Color secondaryColor = Color(0xFF0066A1); // Azul claro UNL
+  static const Color accentColor = Color(0xFF003557); // Azul oscuro UNL
+  static const Color errorColor = Color(0xFFD32F2F); // Rojo error
   static const Color backgroundColor = Color(0xFFF5F5F5);
   static const Color cardColor = Colors.white;
-  static const Color textPrimary = Color(0xFF211915); // Negro/Gris oscuro UNL
+  static const Color textPrimary = Color(0xFF211915); // Negro/Gris oscuro
   static const Color textSecondary = Color(0xFF757575);
 
-  // Colores adicionales UNL
-  static const Color greenOlive = Color(0xFF648F39); // Verde oliva UNL
+  // Colores de gradiente azul UNL
+  static const Color blueLight = Color(0xFF0077B6); // Azul claro
+  static const Color blueMedium = Color(0xFF004C7B); // Azul medio (principal)
+  static const Color blueDark = Color(0xFF003557); // Azul oscuro
 
   static ThemeData get lightTheme {
     return ThemeData(

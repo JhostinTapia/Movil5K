@@ -241,7 +241,7 @@ class _TimerScreenState extends State<TimerScreen> {
       ];
     }
     if (provider.isRunning) {
-      return [const Color(0xFFBF0811), const Color(0xFF418E3A)];
+      return [const Color(0xFF004C7B), const Color(0xFF0066A1)];
     }
     return [Colors.grey.shade400, Colors.grey.shade500];
   }
@@ -366,7 +366,7 @@ class _TimerScreenState extends State<TimerScreen> {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+                colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -434,7 +434,7 @@ class _TimerScreenState extends State<TimerScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFFBF0811),
+                          foregroundColor: const Color(0xFF004C7B),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -467,7 +467,7 @@ class _TimerScreenState extends State<TimerScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+              colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
             ),
             borderRadius: BorderRadius.circular(20),
           ),
@@ -514,7 +514,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFFBF0811),
+                    foregroundColor: const Color(0xFF004C7B),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1005,7 +1005,7 @@ class _TimerScreenState extends State<TimerScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+              colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -1531,7 +1531,7 @@ class _TimerScreenState extends State<TimerScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFBF0811), Color(0xFF418E3A), Color(0xFF004C7B)],
+            colors: [Color(0xFF004C7B), Color(0xFF0066A1), Color(0xFF004C7B)],
           ),
         ),
         child: Stack(
@@ -1647,7 +1647,7 @@ class _TimerScreenState extends State<TimerScreen> {
                               color:
                                   timerProvider.participantesRegistrados >=
                                       TimerProvider.maxParticipantes
-                                  ? const Color(0xFFBF0811)
+                                  ? const Color(0xFF004C7B)
                                   : Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -1743,8 +1743,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                             ]
                                           : timerProvider.isRunning
                                           ? [
-                                              const Color(0xFFBF0811),
-                                              const Color(0xFF418E3A),
+                                              const Color(0xFF004C7B),
+                                              const Color(0xFF0066A1),
                                             ]
                                           : [
                                               Colors.grey.shade600,
@@ -1820,8 +1820,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                 )
                               : const LinearGradient(
                                   colors: [
-                                    Color(0xFFBF0811),
-                                    Color(0xFF418E3A),
+                                    Color(0xFF004C7B),
+                                    Color(0xFF0066A1),
                                   ],
                                 ),
                           borderRadius: BorderRadius.circular(15),
@@ -1832,7 +1832,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                     (timerProvider.participantesRegistrados !=
                                                 15
                                             ? Colors.orange
-                                            : const Color(0xFFBF0811))
+                                            : const Color(0xFF004C7B))
                                         .withOpacity(0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 5),
@@ -1893,14 +1893,14 @@ class _TimerScreenState extends State<TimerScreen> {
                         width: double.infinity,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
+                            colors: [Color(0xFF004C7B), Color(0xFF0066A1)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: timerProvider.marcandoTiempo ? [] : [
                             BoxShadow(
-                              color: const Color(0xFFBF0811).withOpacity(0.4),
+                              color: const Color(0xFF004C7B).withOpacity(0.4),
                               blurRadius: 15,
                               offset: const Offset(0, 6),
                             ),
@@ -1971,8 +1971,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [
-                                        Color(0xFFBF0811),
-                                        Color(0xFF418E3A),
+                                        Color(0xFF004C7B),
+                                        Color(0xFF0066A1),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(10),
@@ -1989,7 +1989,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFFBF0811),
+                                    color: Color(0xFF004C7B),
                                   ),
                                 ),
                                 const Spacer(),
@@ -2002,8 +2002,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                     decoration: BoxDecoration(
                                       gradient: const LinearGradient(
                                         colors: [
-                                          Color(0xFFBF0811),
-                                          Color(0xFF418E3A),
+                                          Color(0xFF004C7B),
+                                          Color(0xFF0066A1),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(12),
@@ -2024,7 +2024,7 @@ class _TimerScreenState extends State<TimerScreen> {
                           Expanded(
                             child: RefreshIndicator(
                               onRefresh: () => timerProvider.refrescarDatos(),
-                              color: const Color(0xFFBF0811),
+                              color: const Color(0xFF004C7B),
                               backgroundColor: Colors.white,
                               strokeWidth: 2.5,
                               child: timerProvider.registros.isEmpty
@@ -2051,10 +2051,10 @@ class _TimerScreenState extends State<TimerScreen> {
                                                   gradient: LinearGradient(
                                                     colors: [
                                                       const Color(
-                                                        0xFFBF0811,
+                                                        0xFF004C7B,
                                                       ).withOpacity(0.1),
                                                       const Color(
-                                                        0xFF418E3A,
+                                                        0xFF0066A1,
                                                       ).withOpacity(0.1),
                                                     ],
                                                   ),
