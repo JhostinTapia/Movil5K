@@ -249,8 +249,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-
-
   Widget _buildLoginButton(bool isLoading) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -331,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)],
+            colors: [Color(0xFFBF0811), Color(0xFF418E3A), Color(0xFF004C7B)],
           ),
         ),
         child: AnimatedBuilder(
@@ -376,29 +374,44 @@ class _LoginScreenState extends State<LoginScreen>
                                           Hero(
                                             tag: 'logo',
                                             child: Container(
-                                              width: screenHeight < 700 ? 80 : 100,
-                                              height: screenHeight < 700 ? 80 : 100,
+                                              width: screenHeight < 700
+                                                  ? 100
+                                                  : 130,
+                                              height: screenHeight < 700
+                                                  ? 100
+                                                  : 130,
                                               decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(0.2),
+                                                color: Colors.white,
                                                 shape: BoxShape.circle,
                                                 border: Border.all(
-                                                  color: Colors.white.withOpacity(0.3),
-                                                  width: 2,
+                                                  color: Colors.white,
+                                                  width: 3,
                                                 ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withOpacity(0.2),
+                                                    blurRadius: 10,
+                                                    offset: const Offset(0, 5),
+                                                  ),
+                                                ],
                                               ),
-                                              child: Icon(
-                                                FontAwesomeIcons.stopwatch,
-                                                color: Colors.white,
-                                                size: screenHeight < 700 ? 40 : 50,
+                                              child: ClipOval(
+                                                child: Image.asset(
+                                                  'assets/img/logoUNL.png',
+                                                  fit: BoxFit.cover,
+                                                ),
                                               ),
                                             ),
                                           ),
                                           const SizedBox(height: 16),
                                           Text(
-                                            'Carrera 5K UNL',
+                                            'RASC UNL',
                                             style: TextStyle(
                                               color: Colors.white,
-                                              fontSize: screenHeight < 700 ? 24 : 28,
+                                              fontSize: screenHeight < 700
+                                                  ? 24
+                                                  : 28,
                                               fontWeight: FontWeight.bold,
                                               letterSpacing: 1.2,
                                             ),
@@ -407,8 +420,12 @@ class _LoginScreenState extends State<LoginScreen>
                                           Text(
                                             'Sistema de Registro de Tiempos',
                                             style: TextStyle(
-                                              color: Colors.white.withOpacity(0.8),
-                                              fontSize: screenHeight < 700 ? 14 : 16,
+                                              color: Colors.white.withOpacity(
+                                                0.8,
+                                              ),
+                                              fontSize: screenHeight < 700
+                                                  ? 14
+                                                  : 16,
                                             ),
                                           ),
                                         ],
@@ -425,14 +442,20 @@ class _LoginScreenState extends State<LoginScreen>
                                   child: SlideTransition(
                                     position: _slideAnimation,
                                     child: Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 20),
-                                      padding: EdgeInsets.all(screenHeight < 700 ? 20 : 28),
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                      ),
+                                      padding: EdgeInsets.all(
+                                        screenHeight < 700 ? 20 : 28,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(25),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
+                                            color: Colors.black.withOpacity(
+                                              0.1,
+                                            ),
                                             blurRadius: 20,
                                             offset: const Offset(0, 10),
                                           ),
@@ -447,21 +470,26 @@ class _LoginScreenState extends State<LoginScreen>
                                             FittedBox(
                                               fit: BoxFit.scaleDown,
                                               child: Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Container(
-                                                    padding: const EdgeInsets.all(8),
+                                                    padding:
+                                                        const EdgeInsets.all(8),
                                                     decoration: BoxDecoration(
-                                                      color: AppTheme.primaryColor
+                                                      color: AppTheme
+                                                          .primaryColor
                                                           .withOpacity(0.1),
-                                                      borderRadius: BorderRadius.circular(
-                                                        8,
-                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
                                                     ),
                                                     child: const Icon(
                                                       Icons.person,
-                                                      color: AppTheme.primaryColor,
+                                                      color:
+                                                          AppTheme.primaryColor,
                                                       size: 20,
                                                     ),
                                                   ),
@@ -470,30 +498,51 @@ class _LoginScreenState extends State<LoginScreen>
                                                     'Inicio de Sesión',
                                                     style: TextStyle(
                                                       fontSize: 20,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: AppTheme.textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppTheme.textPrimary,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            SizedBox(height: screenHeight < 700 ? 18 : 25),
+                                            SizedBox(
+                                              height: screenHeight < 700
+                                                  ? 18
+                                                  : 25,
+                                            ),
 
                                             // Campo usuario/email
                                             _buildNombreField(),
-                                            SizedBox(height: screenHeight < 700 ? 14 : 20),
+                                            SizedBox(
+                                              height: screenHeight < 700
+                                                  ? 14
+                                                  : 20,
+                                            ),
 
                                             // Campo contraseña
                                             _buildPasswordField(),
-                                            SizedBox(height: screenHeight < 700 ? 18 : 25),
+                                            SizedBox(
+                                              height: screenHeight < 700
+                                                  ? 18
+                                                  : 25,
+                                            ),
 
                                             // Botón de login
-                                            _buildLoginButton(authProvider.isLoading),
-                                            SizedBox(height: screenHeight < 700 ? 14 : 20),
+                                            _buildLoginButton(
+                                              authProvider.isLoading,
+                                            ),
+                                            SizedBox(
+                                              height: screenHeight < 700
+                                                  ? 14
+                                                  : 20,
+                                            ),
 
                                             // Información adicional
                                             Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
                                                 Icon(
                                                   Icons.info_outline,
@@ -505,10 +554,12 @@ class _LoginScreenState extends State<LoginScreen>
                                                   child: Text(
                                                     'Ingresa con tu usuario o email',
                                                     style: TextStyle(
-                                                      color: Colors.grey.shade600,
+                                                      color:
+                                                          Colors.grey.shade600,
                                                       fontSize: 12,
                                                     ),
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],
