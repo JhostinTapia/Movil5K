@@ -19,11 +19,15 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
-        final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+        final timerProvider = Provider.of<TimerProvider>(
+          context,
+          listen: false,
+        );
         final equipo = args['equipo'] as Equipo;
-        
+
         await timerProvider.setEquipo(equipo);
       }
     });
@@ -33,7 +37,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
     final hours = milliseconds ~/ 3600000;
     final minutes = (milliseconds % 3600000) ~/ 60000;
     final seconds = (milliseconds % 60000) ~/ 1000;
-    
+
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
@@ -49,14 +53,14 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
     }
 
     final tiempos = registros.map((r) => r.tiempo).toList();
-    
+
     // Contar penalizaciones (tiempo = 0)
     final penalizaciones = registros.where((r) => r.tiempo == 0).length;
-    
+
     // Filtrar tiempos válidos (excluir penalizaciones de 00:00:00.00)
     final tiemposValidos = tiempos.where((t) => t > 0).toList();
-    
-    final mejorTiempo = tiemposValidos.isNotEmpty 
+
+    final mejorTiempo = tiemposValidos.isNotEmpty
         ? tiemposValidos.reduce((a, b) => a < b ? a : b)
         : 0;
     final peorTiempo = tiempos.reduce((a, b) => a > b ? a : b);
@@ -66,7 +70,8 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
       'mejorTiempo': mejorTiempo,
       'peorTiempo': peorTiempo,
       'tiempoTotal': tiempoTotal,
-      'totalParticipantes': registros.length - penalizaciones, // Solo los que participaron
+      'totalParticipantes':
+          registros.length - penalizaciones, // Solo los que participaron
       'totalPenalizaciones': penalizaciones,
     };
   }
@@ -87,7 +92,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
               ),
             ),
             child: SafeArea(
@@ -95,11 +100,17 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                 children: [
                   // Header
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                          icon: const Icon(
+                            Icons.arrow_back_ios,
+                            color: Colors.white,
+                          ),
                           onPressed: () => Navigator.pop(context),
                         ),
                         Expanded(
@@ -119,7 +130,10 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                 child: Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(0.25),
                                         borderRadius: BorderRadius.circular(8),
@@ -135,15 +149,25 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.green.withOpacity(0.3),
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.white, width: 1),
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 1,
+                                        ),
                                       ),
                                       child: const Row(
                                         children: [
-                                          Icon(Icons.check_circle, color: Colors.white, size: 14),
+                                          Icon(
+                                            Icons.check_circle,
+                                            color: Colors.white,
+                                            size: 14,
+                                          ),
                                           SizedBox(width: 4),
                                           Text(
                                             'Datos Enviados',
@@ -157,19 +181,31 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                       ),
                                     ),
                                     // Badge DESCALIFICADO si hay penalizaciones
-                                    if (estadisticas['totalPenalizaciones'] > 0) 
+                                    if (estadisticas['totalPenalizaciones'] > 0)
                                       const SizedBox(width: 8),
                                     if (estadisticas['totalPenalizaciones'] > 0)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.red.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.redAccent, width: 1),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.redAccent,
+                                            width: 1,
+                                          ),
                                         ),
                                         child: const Row(
                                           children: [
-                                            Icon(Icons.cancel, color: Colors.redAccent, size: 14),
+                                            Icon(
+                                              Icons.cancel,
+                                              color: Colors.redAccent,
+                                              size: 14,
+                                            ),
                                             SizedBox(width: 4),
                                             Text(
                                               'DESCALIFICADO',
@@ -217,8 +253,9 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                               _buildEstadisticaItem(
                                 icon: FontAwesomeIcons.users,
                                 label: 'Participantes',
-                                valor: '${estadisticas['totalParticipantes']}/15',
-                                color: const Color(0xFF667eea),
+                                valor:
+                                    '${estadisticas['totalParticipantes']}/15',
+                                color: const Color(0xFFBF0811),
                               ),
                               Container(
                                 width: 1,
@@ -228,7 +265,9 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                               _buildEstadisticaItem(
                                 icon: FontAwesomeIcons.trophy,
                                 label: 'Mejor Tiempo',
-                                valor: _formatearTiempo(estadisticas['mejorTiempo']),
+                                valor: _formatearTiempo(
+                                  estadisticas['mejorTiempo'],
+                                ),
                                 color: const Color(0xFFE53935),
                                 esTiempo: true,
                               ),
@@ -236,7 +275,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        
+
                         // Tiempo Total y Peor Tiempo
                         Row(
                           children: [
@@ -272,7 +311,9 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _formatearTiempo(estadisticas['tiempoTotal']),
+                                      _formatearTiempo(
+                                        estadisticas['tiempoTotal'],
+                                      ),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -317,7 +358,9 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      _formatearTiempo(estadisticas['peorTiempo']),
+                                      _formatearTiempo(
+                                        estadisticas['peorTiempo'],
+                                      ),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -355,7 +398,7 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                               children: [
                                 const Icon(
                                   FontAwesomeIcons.clockRotateLeft,
-                                  color: Color(0xFF667eea),
+                                  color: Color(0xFFBF0811),
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
@@ -369,10 +412,16 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                 ),
                                 const Spacer(),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                      colors: [
+                                        Color(0xFFBF0811),
+                                        Color(0xFF418E3A),
+                                      ],
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -392,7 +441,8 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                             child: timerProvider.registros.isEmpty
                                 ? Center(
                                     child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           FontAwesomeIcons.inbox,
@@ -412,22 +462,34 @@ class _ResultadosEquipoScreenState extends State<ResultadosEquipoScreen> {
                                     ),
                                   )
                                 : ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
                                     itemCount: timerProvider.registros.length,
                                     itemBuilder: (context, index) {
                                       // Ordenar: registros normales primero, penalizaciones al final
-                                      final registrosOrdenados = [...timerProvider.registros]
-                                        ..sort((a, b) {
-                                          if (a.tiempo == 0 && b.tiempo != 0) return 1; // a al final
-                                          if (a.tiempo != 0 && b.tiempo == 0) return -1; // b al final
-                                          return 0; // mantener orden original
-                                        });
-                                      
-                                      final registro = registrosOrdenados[index];
+                                      final registrosOrdenados =
+                                          [...timerProvider.registros]..sort((
+                                            a,
+                                            b,
+                                          ) {
+                                            if (a.tiempo == 0 && b.tiempo != 0)
+                                              return 1; // a al final
+                                            if (a.tiempo != 0 && b.tiempo == 0)
+                                              return -1; // b al final
+                                            return 0; // mantener orden original
+                                          });
+
+                                      final registro =
+                                          registrosOrdenados[index];
                                       return TimeMarkCard(
                                         registro: registro,
                                         posicion: index + 1,
-                                        mostrarBotonEliminar: false, // Nunca mostrar en resultados
+                                        mostrarBotonEliminar:
+                                            false, // Nunca mostrar en resultados
                                         onDelete: () {}, // No hace nada
                                       );
                                     },
