@@ -32,7 +32,7 @@ class _TimerScreenState extends State<TimerScreen> {
         return;
       }
       _isInitialized = true;
-      
+
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
@@ -241,7 +241,7 @@ class _TimerScreenState extends State<TimerScreen> {
       ];
     }
     if (provider.isRunning) {
-      return [const Color(0xFF667eea), const Color(0xFF764ba2)];
+      return [const Color(0xFFBF0811), const Color(0xFF418E3A)];
     }
     return [Colors.grey.shade400, Colors.grey.shade500];
   }
@@ -250,6 +250,68 @@ class _TimerScreenState extends State<TimerScreen> {
     if (provider.isCompleted) return Icons.check_circle;
     if (provider.isRunning) return Icons.play_circle_filled;
     return Icons.pause_circle;
+  }
+
+  // Widget del botón de penalización con animación de iluminación
+  Widget _buildPenalizacionButton(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 1500),
+      builder: (context, value, child) {
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF6B35).withOpacity(
+                  0.3 +
+                      (0.4 *
+                          (0.5 + 0.5 * (value > 0.5 ? 1 - value : value) * 2)),
+                ),
+                blurRadius:
+                    8 +
+                    (6 * (0.5 + 0.5 * (value > 0.5 ? 1 - value : value) * 2)),
+                spreadRadius:
+                    1 +
+                    (2 * (0.5 + 0.5 * (value > 0.5 ? 1 - value : value) * 2)),
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+      child: Tooltip(
+        message: 'Registrar jugadores ausentes',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _mostrarDialogPenalizacion(context),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFF6B35), Color(0xFFFF8C42)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.6),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.person_off_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _mostrarConfirmacionEnvio(BuildContext context) async {
@@ -304,7 +366,7 @@ class _TimerScreenState extends State<TimerScreen> {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -372,7 +434,7 @@ class _TimerScreenState extends State<TimerScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF667eea),
+                          foregroundColor: const Color(0xFFBF0811),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -405,7 +467,7 @@ class _TimerScreenState extends State<TimerScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
             ),
             borderRadius: BorderRadius.circular(20),
           ),
@@ -452,7 +514,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF667eea),
+                    foregroundColor: const Color(0xFFBF0811),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -620,9 +682,7 @@ class _TimerScreenState extends State<TimerScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -683,10 +743,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   ),
                   child: const Text(
                     'Entendido',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
               ),
@@ -702,9 +759,7 @@ class _TimerScreenState extends State<TimerScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -724,11 +779,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.devices,
-                  color: Colors.white,
-                  size: 40,
-                ),
+                child: const Icon(Icons.devices, color: Colors.white, size: 40),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -765,10 +816,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   ),
                   child: const Text(
                     'Entendido',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
               ),
@@ -784,9 +832,7 @@ class _TimerScreenState extends State<TimerScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
@@ -847,10 +893,7 @@ class _TimerScreenState extends State<TimerScreen> {
                   ),
                   child: const Text(
                     'Aceptar',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
               ),
@@ -962,7 +1005,7 @@ class _TimerScreenState extends State<TimerScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -1007,10 +1050,11 @@ class _TimerScreenState extends State<TimerScreen> {
       } else {
         // Verificar si es error de conflicto (409 - ya tiene registros)
         final mensaje = resultado['message'] ?? 'Error desconocido';
-        final esConflicto = mensaje.contains('409') || 
-                           mensaje.contains('ya tiene') || 
-                           mensaje.contains('No se permiten');
-        
+        final esConflicto =
+            mensaje.contains('409') ||
+            mensaje.contains('ya tiene') ||
+            mensaje.contains('No se permiten');
+
         if (esConflicto) {
           // Mostrar como advertencia, no como error
           _mostrarModalYaEnviadoDesdeOtroDispositivo(navigator.context);
@@ -1487,7 +1531,7 @@ class _TimerScreenState extends State<TimerScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)],
+            colors: [Color(0xFFBF0811), Color(0xFF418E3A), Color(0xFF004C7B)],
           ),
         ),
         child: Stack(
@@ -1603,40 +1647,16 @@ class _TimerScreenState extends State<TimerScreen> {
                               color:
                                   timerProvider.participantesRegistrados >=
                                       TimerProvider.maxParticipantes
-                                  ? const Color(0xFF667eea)
+                                  ? const Color(0xFFBF0811)
                                   : Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        // Botón de penalización (icono de usuario faltante)
-                        Tooltip(
-                          message: 'Registrar jugadores ausentes',
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => _mostrarDialogPenalizacion(context),
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.4),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.person_off_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                        // Botón de penalización con animación de iluminación
+                        const SizedBox(width: 12),
+                        _buildPenalizacionButton(context),
                       ],
                     ),
                   ),
@@ -1723,8 +1743,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                             ]
                                           : timerProvider.isRunning
                                           ? [
-                                              const Color(0xFF667eea),
-                                              const Color(0xFF764ba2),
+                                              const Color(0xFFBF0811),
+                                              const Color(0xFF418E3A),
                                             ]
                                           : [
                                               Colors.grey.shade600,
@@ -1736,7 +1756,8 @@ class _TimerScreenState extends State<TimerScreen> {
                             ),
                           ),
                           // Mensaje cuando la competencia no ha iniciado
-                          if (!timerProvider.isRunning && !timerProvider.isCompleted)
+                          if (!timerProvider.isRunning &&
+                              !timerProvider.isCompleted)
                             Padding(
                               padding: const EdgeInsets.only(top: 16),
                               child: Container(
@@ -1799,8 +1820,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                 )
                               : const LinearGradient(
                                   colors: [
-                                    Color(0xFF667eea),
-                                    Color(0xFF764ba2),
+                                    Color(0xFFBF0811),
+                                    Color(0xFF418E3A),
                                   ],
                                 ),
                           borderRadius: BorderRadius.circular(15),
@@ -1811,7 +1832,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                     (timerProvider.participantesRegistrados !=
                                                 15
                                             ? Colors.orange
-                                            : const Color(0xFF667eea))
+                                            : const Color(0xFFBF0811))
                                         .withOpacity(0.4),
                                 blurRadius: 12,
                                 offset: const Offset(0, 5),
@@ -1871,17 +1892,15 @@ class _TimerScreenState extends State<TimerScreen> {
                       child: Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: timerProvider.marcandoTiempo 
-                              ? [Colors.grey.shade400, Colors.grey.shade500]
-                              : [const Color(0xFF667eea), const Color(0xFF764ba2)],
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFBF0811), Color(0xFF418E3A)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: timerProvider.marcandoTiempo ? [] : [
                             BoxShadow(
-                              color: const Color(0xFF667eea).withOpacity(0.4),
+                              color: const Color(0xFFBF0811).withOpacity(0.4),
                               blurRadius: 15,
                               offset: const Offset(0, 6),
                             ),
@@ -1952,8 +1971,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
                                       colors: [
-                                        Color(0xFF667eea),
-                                        Color(0xFF764ba2),
+                                        Color(0xFFBF0811),
+                                        Color(0xFF418E3A),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(10),
@@ -1970,7 +1989,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF667eea),
+                                    color: Color(0xFFBF0811),
                                   ),
                                 ),
                                 const Spacer(),
@@ -1983,8 +2002,8 @@ class _TimerScreenState extends State<TimerScreen> {
                                     decoration: BoxDecoration(
                                       gradient: const LinearGradient(
                                         colors: [
-                                          Color(0xFF667eea),
-                                          Color(0xFF764ba2),
+                                          Color(0xFFBF0811),
+                                          Color(0xFF418E3A),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(12),
@@ -2005,32 +2024,45 @@ class _TimerScreenState extends State<TimerScreen> {
                           Expanded(
                             child: RefreshIndicator(
                               onRefresh: () => timerProvider.refrescarDatos(),
-                              color: const Color(0xFF667eea),
+                              color: const Color(0xFFBF0811),
                               backgroundColor: Colors.white,
                               strokeWidth: 2.5,
                               child: timerProvider.registros.isEmpty
                                   ? ListView(
                                       // ListView vacío para que funcione el pull-to-refresh
-                                      physics: const AlwaysScrollableScrollPhysics(),
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
                                       children: [
                                         SizedBox(
-                                          height: MediaQuery.of(context).size.height * 0.25,
+                                          height:
+                                              MediaQuery.of(
+                                                context,
+                                              ).size.height *
+                                              0.25,
                                           child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.all(20),
+                                                padding: const EdgeInsets.all(
+                                                  20,
+                                                ),
                                                 decoration: BoxDecoration(
                                                   gradient: LinearGradient(
                                                     colors: [
-                                                      const Color(0xFF667eea).withOpacity(0.1),
-                                                      const Color(0xFF764ba2).withOpacity(0.1),
+                                                      const Color(
+                                                        0xFFBF0811,
+                                                      ).withOpacity(0.1),
+                                                      const Color(
+                                                        0xFF418E3A,
+                                                      ).withOpacity(0.1),
                                                     ],
                                                   ),
                                                   shape: BoxShape.circle,
                                                 ),
                                                 child: Icon(
-                                                  FontAwesomeIcons.clockRotateLeft,
+                                                  FontAwesomeIcons
+                                                      .clockRotateLeft,
                                                   size: 50,
                                                   color: Colors.grey.shade300,
                                                 ),
@@ -2068,18 +2100,27 @@ class _TimerScreenState extends State<TimerScreen> {
                                       ],
                                     )
                                   : ListView.builder(
-                                      physics: const AlwaysScrollableScrollPhysics(),
-                                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        0,
+                                        16,
+                                        16,
+                                      ),
                                       itemCount: timerProvider.registros.length,
                                       itemBuilder: (context, index) {
-                                        final registro = timerProvider.registros[index];
+                                        final registro =
+                                            timerProvider.registros[index];
                                         return TimeMarkCard(
                                           registro: registro,
                                           posicion: index + 1,
-                                          mostrarBotonEliminar: !timerProvider.datosEnviados,
-                                          onDelete: () => timerProvider.eliminarRegistro(
-                                            registro.idRegistro,
-                                          ),
+                                          mostrarBotonEliminar:
+                                              !timerProvider.datosEnviados,
+                                          onDelete: () =>
+                                              timerProvider.eliminarRegistro(
+                                                registro.idRegistro,
+                                              ),
                                         );
                                       },
                                     ),
