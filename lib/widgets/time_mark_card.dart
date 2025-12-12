@@ -8,12 +8,14 @@ class TimeMarkCard extends StatelessWidget {
   final RegistroTiempo registro;
   final int posicion;
   final VoidCallback onDelete;
+  final bool mostrarBotonEliminar; // Nuevo parámetro
 
   const TimeMarkCard({
     super.key,
     required this.registro,
     required this.posicion,
     required this.onDelete,
+    this.mostrarBotonEliminar = true, // Por defecto true para compatibilidad
   });
 
   List<Color> _getPosicionGradient(int pos) {
@@ -177,18 +179,19 @@ class TimeMarkCard extends StatelessWidget {
                             registro.penalizado
                                 ? Icons.gavel_rounded
                                 : Icons.schedule_rounded,
-                            size: 12,
+                            size: 13,
                             color: Colors.white.withOpacity(0.9),
                           ),
                           const SizedBox(width: 5),
                           Text(
                             registro.penalizado
-                                ? 'Tiempo Agregado'
-                                : dateFormat.format(registro.timestamp),
+                                ? 'Penalización Agregada'
+                                : 'Registrado a las ${dateFormat.format(registro.timestamp)}',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               color: Colors.white.withOpacity(0.9),
                               fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
@@ -196,8 +199,9 @@ class TimeMarkCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Botón eliminar
-                Container(
+                // Botón eliminar (solo si está permitido)
+                if (mostrarBotonEliminar)
+                  Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(

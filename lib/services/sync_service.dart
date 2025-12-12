@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'database_service.dart';
+import 'api_service.dart';
 import '../models/registro_tiempo.dart';
 
 /// Resultado de sincronización
@@ -21,28 +22,44 @@ class SyncResult {
 }
 
 /// Servicio de sincronización de registros con el servidor
+/// 
+/// ARQUITECTURA:
+/// - Los registros se envían por HTTP POST (más confiable)
+/// - El WebSocket solo se usa para recibir notificaciones
 class SyncService {
   final DatabaseService _databaseService;
   final Connectivity _connectivity;
+  final ApiService _apiService;
 
   // Límite de registros por lote (según backend)
   static const int maxRegistrosPorLote = 15;
 
-  SyncService(this._databaseService, [Connectivity? connectivity])
-    : _connectivity = connectivity ?? Connectivity();
+  SyncService(this._databaseService, [Connectivity? connectivity, ApiService? apiService])
+    : _connectivity = connectivity ?? Connectivity(),
+      _apiService = apiService ?? ApiService();
 
-  /// Sincronizar registros pendientes usando WebSocket
-  /// Esta función NO usa HTTP, sino que envía directamente por WebSocket
-  /// cuando el timer_provider llame a syncRegistros()
+  /// Sincronizar registros pendientes usando HTTP POST
+  /// 
+  /// Esta función envía los registros al servidor usando HTTP
+  /// que es más confiable que WebSocket para operaciones CRUD.
   Future<SyncResult> syncRegistros({
     required int equipoId,
     required String accessToken,
   }) async {
-    // NOTA: La sincronización real se hace por WebSocket en tiempo real
-    // Esta función solo retorna el estado de los registros en BD local
+    print('📊 Sincronizando registros para equipo $equipoId via HTTP');
 
-    print('📊 Verificando estado de sincronización para equipo $equipoId');
+    // Verificar conectividad
+    final hasConnection = await _checkConnectivity();
+    if (!hasConnection) {
+      return SyncResult(
+        totalEnviados: 0,
+        exitosos: 0,
+        fallidos: 0,
+        errores: ['No hay conexión a internet'],
+      );
+    }
 
+    // Obtener registros pendientes
     final registrosPendientes = await _databaseService
         .getRegistrosNoSincronizados(equipoId);
 
@@ -56,34 +73,85 @@ class SyncService {
       );
     }
 
-    // Los registros se enviaron en tiempo real por WebSocket
-    // Solo marcarlos como sincronizados si están en BD
-    int exitosos = 0;
-    for (final registro in registrosPendientes) {
-      try {
-        await _databaseService.marcarComoSincronizado(registro.idRegistro);
-        exitosos++;
-      } catch (e) {
-        print('⚠️ Error marcando registro como sincronizado: $e');
-      }
+    // Verificar que tengamos exactamente 15 registros
+    if (registrosPendientes.length != maxRegistrosPorLote) {
+      print('⚠️ Se esperan $maxRegistrosPorLote registros, hay ${registrosPendientes.length}');
+      return SyncResult(
+        totalEnviados: 0,
+        exitosos: 0,
+        fallidos: registrosPendientes.length,
+        errores: ['Se requieren exactamente $maxRegistrosPorLote registros para sincronizar'],
+      );
     }
 
-    print('✅ $exitosos registros marcados como sincronizados');
+    try {
+      // Preparar payload para HTTP
+      final registrosPayload = registrosPendientes.map((r) => {
+        'id_registro': r.idRegistro,
+        'tiempo': r.tiempo,
+        'horas': r.horas,
+        'minutos': r.minutos,
+        'segundos': r.segundos,
+        'milisegundos': r.milisegundos,
+      }).toList();
 
-    return SyncResult(
-      totalEnviados: registrosPendientes.length,
-      exitosos: exitosos,
-      fallidos: 0,
-      errores: [],
-    );
+      print('📤 Enviando ${registrosPayload.length} registros por HTTP...');
+
+      // Enviar por HTTP
+      final response = await _apiService.enviarRegistros(
+        equipoId: equipoId,
+        registros: registrosPayload,
+      );
+
+      if (response['exito'] == true) {
+        // Marcar todos como sincronizados
+        int exitosos = 0;
+        for (final registro in registrosPendientes) {
+          try {
+            await _databaseService.marcarComoSincronizado(registro.idRegistro);
+            exitosos++;
+          } catch (e) {
+            print('⚠️ Error marcando registro como sincronizado: $e');
+          }
+        }
+
+        print('✅ ${response['total_guardados']} registros sincronizados exitosamente');
+
+        return SyncResult(
+          totalEnviados: registrosPendientes.length,
+          exitosos: exitosos,
+          fallidos: 0,
+          errores: [],
+        );
+      } else {
+        final errorMsg = response['error'] ?? 'Error desconocido';
+        print('❌ Error del servidor: $errorMsg');
+        
+        return SyncResult(
+          totalEnviados: registrosPendientes.length,
+          exitosos: 0,
+          fallidos: registrosPendientes.length,
+          errores: [errorMsg],
+        );
+      }
+    } catch (e) {
+      print('❌ Error sincronizando: $e');
+      return SyncResult(
+        totalEnviados: registrosPendientes.length,
+        exitosos: 0,
+        fallidos: registrosPendientes.length,
+        errores: ['Error de red: $e'],
+      );
+    }
   }
 
-  /// Enviar lote de registros por WebSocket
-  /// Esta función la llamará el TimerProvider cuando complete los 15 registros
-  Future<void> enviarRegistrosPorWebSocket({
+  /// Enviar registros por HTTP (método directo)
+  /// 
+  /// Este método reemplaza al antiguo enviarRegistrosPorWebSocket.
+  /// Usa HTTP POST que es más confiable para envío de datos.
+  Future<SyncResult> enviarRegistrosPorHttp({
     required int equipoId,
     required List<RegistroTiempo> registros,
-    required void Function(Map<String, dynamic>) sendWebSocketMessage,
   }) async {
     // Verificar conectividad
     final hasConnection = await _checkConnectivity();
@@ -95,11 +163,9 @@ class SyncService {
       throw Exception('No hay registros para enviar');
     }
 
-    print(
-      '📤 Enviando ${registros.length} registros por WebSocket para equipo $equipoId',
-    );
+    print('📤 Enviando ${registros.length} registros por HTTP para equipo $equipoId');
 
-    // Asegurar máximo 15 registros por envío para respetar el límite del servidor
+    // Asegurar máximo 15 registros
     final registrosAEnviar = registros.length > maxRegistrosPorLote 
         ? registros.sublist(0, maxRegistrosPorLote) 
         : registros;
@@ -108,30 +174,43 @@ class SyncService {
       print('⚠️ Se intentaron enviar ${registros.length} registros. Se recortó a $maxRegistrosPorLote.');
     }
 
-    // Construir payload según el formato esperado por el backend WebSocket
-    // Ver app/websocket/consumers.py - manejar_registro_tiempos_batch
-    // Formato: {"tipo": "registrar_tiempos", "equipo_id": 1, "registros": [...]}
-    final payload = {
-      'tipo': 'registrar_tiempos',
-      'equipo_id': equipoId,
-      'registros': registrosAEnviar
-          .map(
-            (r) => {
-              'id_registro': r.idRegistro, // UUID para idempotencia
-              'tiempo': r.tiempo,
-              'horas': r.horas,
-              'minutos': r.minutos,
-              'segundos': r.segundos,
-              'milisegundos': r.milisegundos,
-            },
-          )
-          .toList(),
-    };
+    // Preparar payload
+    final registrosPayload = registrosAEnviar.map((r) => {
+      'id_registro': r.idRegistro,
+      'tiempo': r.tiempo,
+      'horas': r.horas,
+      'minutos': r.minutos,
+      'segundos': r.segundos,
+      'milisegundos': r.milisegundos,
+    }).toList();
 
-    // Enviar por WebSocket
-    sendWebSocketMessage(payload);
+    try {
+      final response = await _apiService.enviarRegistros(
+        equipoId: equipoId,
+        registros: registrosPayload,
+      );
 
-    print('✅ Registros enviados por WebSocket');
+      if (response['exito'] == true) {
+        // Marcar como sincronizados
+        for (final registro in registrosAEnviar) {
+          await _databaseService.marcarComoSincronizado(registro.idRegistro);
+        }
+
+        print('✅ Registros enviados y sincronizados exitosamente');
+
+        return SyncResult(
+          totalEnviados: registrosAEnviar.length,
+          exitosos: response['total_guardados'] ?? registrosAEnviar.length,
+          fallidos: 0,
+          errores: [],
+        );
+      } else {
+        throw Exception(response['error'] ?? 'Error desconocido');
+      }
+    } catch (e) {
+      print('❌ Error enviando registros: $e');
+      rethrow;
+    }
   }
 
   /// Verificar conectividad

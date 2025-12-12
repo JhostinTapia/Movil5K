@@ -9,6 +9,7 @@ import 'providers/timer_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/timer_screen.dart';
 import 'screens/equipos_asignados_screen.dart';
+import 'screens/resultados_equipo_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/equipos': (context) => const EquiposAsignadosScreen(),
           '/timer': (context) => const TimerScreen(),
+          '/resultados': (context) => const ResultadosEquipoScreen(),
         },
       ),
     );

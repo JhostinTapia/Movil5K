@@ -8,7 +8,6 @@ import '../config/theme.dart';
 import '../models/equipo.dart';
 import '../models/competencia.dart';
 import '../widgets/time_mark_card.dart';
-import '../widgets/database_viewer_modal.dart';
 import '../services/connectivity_service.dart';
 import '../services/websocket_service.dart';
 
@@ -21,11 +20,19 @@ class TimerScreen extends StatefulWidget {
 
 class _TimerScreenState extends State<TimerScreen> {
   StreamSubscription? _wsMessageSubscription;
-  
+  bool _isInitialized = false; // Flag para evitar doble inicialización
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // ========== PROTECCIÓN CONTRA DOBLE INICIALIZACIÓN ==========
+      if (_isInitialized) {
+        debugPrint('⚠️ TimerScreen ya inicializado, ignorando...');
+        return;
+      }
+      _isInitialized = true;
+      
       final args =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null) {
@@ -41,53 +48,52 @@ class _TimerScreenState extends State<TimerScreen> {
         if (competencia != null) {
           await timerProvider.setCompetencia(competencia);
         }
-        
+
         // Luego establecer el equipo
         await timerProvider.setEquipo(equipo);
-        
+
         // Conectar el TimerProvider al WebSocket
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         if (authProvider.juez != null) {
           timerProvider.connectWebSocket(authProvider.juez!.id);
           debugPrint('🔌 TimerProvider conectado al WebSocket');
         }
-        
+
         // Escuchar mensajes del WebSocket (incluyendo errores)
         _subscribeToWebSocketMessages(timerProvider);
       }
     });
   }
-  
+
   void _subscribeToWebSocketMessages(TimerProvider timerProvider) {
     // Cancelar suscripción anterior si existe
     _wsMessageSubscription?.cancel();
-    
+
     // Obtener el stream de mensajes WebSocket desde AuthProvider
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final messageStream = authProvider.repository.webSocketMessages;
-    
+
     if (messageStream == null) {
       debugPrint('⚠️ No hay stream de WebSocket disponible');
       return;
     }
-    
+
     // Escuchar mensajes del WebSocket
-    _wsMessageSubscription = messageStream.listen(
-      (message) {
-        if (!mounted) return;
-        
-        // Manejar mensajes de error
-        if (message.type == WebSocketMessageType.error) {
-          final errorMsg = message.data['mensaje'] as String? ?? 'Error de conexión';
-          final errorTecnico = message.data['error_tecnico'] as String?;
-          
-          _mostrarErrorWebSocket(errorMsg, errorTecnico);
-        }
-        // Aquí puedes agregar otros tipos de mensajes en el futuro
-      },
-    );
+    _wsMessageSubscription = messageStream.listen((message) {
+      if (!mounted) return;
+
+      // Manejar mensajes de error
+      if (message.type == WebSocketMessageType.error) {
+        final errorMsg =
+            message.data['mensaje'] as String? ?? 'Error de conexión';
+        final errorTecnico = message.data['error_tecnico'] as String?;
+
+        _mostrarErrorWebSocket(errorMsg, errorTecnico);
+      }
+      // Aquí puedes agregar otros tipos de mensajes en el futuro
+    });
   }
-  
+
   void _mostrarErrorWebSocket(String mensaje, String? errorTecnico) {
     showDialog(
       context: context,
@@ -102,7 +108,11 @@ class _TimerScreenState extends State<TimerScreen> {
                 color: Colors.red.shade100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.error_outline, color: Colors.red.shade700, size: 28),
+              child: Icon(
+                Icons.error_outline,
+                color: Colors.red.shade700,
+                size: 28,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -117,10 +127,7 @@ class _TimerScreenState extends State<TimerScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              mensaje,
-              style: const TextStyle(fontSize: 15, height: 1.5),
-            ),
+            Text(mensaje, style: const TextStyle(fontSize: 15, height: 1.5)),
             if (errorTecnico != null && errorTecnico.isNotEmpty) ...[
               const SizedBox(height: 16),
               ExpansionTile(
@@ -137,7 +144,10 @@ class _TimerScreenState extends State<TimerScreen> {
                     ),
                     child: Text(
                       errorTecnico,
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ],
@@ -158,9 +168,12 @@ class _TimerScreenState extends State<TimerScreen> {
             onPressed: () async {
               Navigator.of(context).pop();
               // Intentar reconectar
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final authProvider = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              );
               final juezId = authProvider.juez?.id;
-              
+
               if (juezId != null) {
                 try {
                   await authProvider.repository.reconnectWebSocket(juezId);
@@ -186,7 +199,9 @@ class _TimerScreenState extends State<TimerScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text('Reintentar'),
           ),
@@ -194,7 +209,7 @@ class _TimerScreenState extends State<TimerScreen> {
       ),
     );
   }
-  
+
   @override
   void dispose() {
     _wsMessageSubscription?.cancel();
@@ -219,8 +234,6 @@ class _TimerScreenState extends State<TimerScreen> {
     if (provider.isRunning) return Icons.play_circle_filled;
     return Icons.pause_circle;
   }
-
-
 
   void _mostrarConfirmacionEnvio(BuildContext context) async {
     final connectivityService = ConnectivityService();
@@ -542,25 +555,37 @@ class _TimerScreenState extends State<TimerScreen> {
                 const SizedBox(height: 28),
 
                 // Botón de Aceptar
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF43A047),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                Consumer<TimerProvider>(
+                  builder: (btnContext, timerProvider, _) => SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(); // Cerrar modal
+                        // Redirigir a pantalla de resultados
+                        Navigator.of(context).pushReplacementNamed(
+                          '/resultados',
+                          arguments: {
+                            'equipo': timerProvider.equipoActual,
+                            'competencia': timerProvider.competenciaActual,
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF43A047),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Aceptar',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
+                      child: const Text(
+                        'Ver Resultados',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ),
@@ -570,6 +595,252 @@ class _TimerScreenState extends State<TimerScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Modal para cuando los datos ya fueron enviados desde este dispositivo
+  void _mostrarModalYaEnviado(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFA726), Color(0xFFFF9800)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Datos Ya Enviados',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Los datos de este equipo ya fueron enviados al servidor exitosamente.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFFFA726),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Entendido',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Modal para cuando los datos fueron enviados desde OTRO dispositivo
+  void _mostrarModalYaEnviadoDesdeOtroDispositivo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.devices,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Datos Sincronizados',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Los tiempos de este equipo ya fueron registrados desde otro dispositivo.\n\nNo te preocupes, los datos están seguros en el servidor.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF1E88E5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Entendido',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Modal genérico para errores
+  void _mostrarModalError(BuildContext context, String mensaje) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFE53935), Color(0xFFEF5350)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Error al Enviar',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                mensaje,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFFE53935),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'Aceptar',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -701,7 +972,7 @@ class _TimerScreenState extends State<TimerScreen> {
     );
 
     try {
-      // Enviar registros por WebSocket (carga desde BD internamente)
+      // Enviar registros por HTTP
       final resultado = await timerProvider.enviarRegistrosPorWebSocket();
 
       // Cerrar indicador de carga usando navigator guardado
@@ -712,88 +983,26 @@ class _TimerScreenState extends State<TimerScreen> {
 
       // Mostrar modal según el resultado
       if (resultado['success'] == true) {
-        // Usar el mismo navigator para mostrar el siguiente dialog
         _mostrarModalExito(navigator.context, resultado['total'] ?? 0);
+      } else if (resultado['yaEnviado'] == true) {
+        // Caso especial: ya estaba enviado (no es un error, es informativo)
+        _mostrarModalYaEnviado(navigator.context);
       } else {
-        // Mostrar error usando navigator.context
-        showDialog(
-          context: navigator.context,
-          builder: (dialogContext) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFE53935), Color(0xFFEF5350)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.cloud_off,
-                      color: Colors.white,
-                      size: 40,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Error al Enviar',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    resultado['message'] ?? 'Error desconocido',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFFE53935),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Aceptar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        // Verificar si es error de conflicto (409 - ya tiene registros)
+        final mensaje = resultado['message'] ?? 'Error desconocido';
+        final esConflicto = mensaje.contains('409') || 
+                           mensaje.contains('ya tiene') || 
+                           mensaje.contains('No se permiten');
+        
+        if (esConflicto) {
+          // Mostrar como advertencia, no como error
+          _mostrarModalYaEnviadoDesdeOtroDispositivo(navigator.context);
+          // Actualizar estado local
+          timerProvider.marcarComoEnviado();
+        } else {
+          // Error real
+          _mostrarModalError(navigator.context, mensaje);
+        }
       }
     } catch (e) {
       debugPrint('Error enviando datos: $e');
@@ -885,8 +1094,38 @@ class _TimerScreenState extends State<TimerScreen> {
 
   void _mostrarDialogPenalizacion(BuildContext context) {
     final timerProvider = Provider.of<TimerProvider>(context, listen: false);
+
+    // Validar que la carrera esté corriendo
+    if (!timerProvider.isRunning) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFFFFA726)),
+              SizedBox(width: 12),
+              Text('Carrera no iniciada'),
+            ],
+          ),
+          content: const Text(
+            'Solo puedes aplicar penalización cuando la carrera está en curso.',
+            style: TextStyle(fontSize: 15),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     int jugadoresFaltantes = 1; // Valor inicial
-    int minutosPenalizacion = 2; // Minutos de penalización por defecto
 
     showDialog(
       context: context,
@@ -936,7 +1175,7 @@ class _TimerScreenState extends State<TimerScreen> {
 
                 // Descripción
                 Text(
-                  'Configura la cantidad de jugadores faltantes y el tiempo de penalización.',
+                  'Ingresa la cantidad de jugadores faltantes',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -1000,79 +1239,14 @@ class _TimerScreenState extends State<TimerScreen> {
 
                           // Botón +
                           IconButton(
-                            onPressed: jugadoresFaltantes < 14
-                                ? () => setState(() => jugadoresFaltantes++)
-                                : null,
-                            icon: const Icon(Icons.add_circle),
-                            color: Colors.white,
-                            disabledColor: Colors.white.withOpacity(0.3),
-                            iconSize: 36,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Selector de minutos de penalización
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Minutos de Penalización',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Botón -
-                          IconButton(
-                            onPressed: minutosPenalizacion > 1
-                                ? () => setState(() => minutosPenalizacion--)
-                                : null,
-                            icon: const Icon(Icons.remove_circle),
-                            color: Colors.white,
-                            disabledColor: Colors.white.withOpacity(0.3),
-                            iconSize: 36,
-                          ),
-                          const SizedBox(width: 20),
-
-                          // Número
-                          Container(
-                            width: 70,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '$minutosPenalizacion',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFF57C00),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-
-                          // Botón +
-                          IconButton(
-                            onPressed: minutosPenalizacion < 30
-                                ? () => setState(() => minutosPenalizacion++)
-                                : null,
+                            onPressed: () {
+                              final registrosActuales =
+                                  timerProvider.participantesRegistrados;
+                              final maxPosibles = 15 - registrosActuales;
+                              if (jugadoresFaltantes < maxPosibles) {
+                                setState(() => jugadoresFaltantes++);
+                              }
+                            },
                             icon: const Icon(Icons.add_circle),
                             color: Colors.white,
                             disabledColor: Colors.white.withOpacity(0.3),
@@ -1082,7 +1256,7 @@ class _TimerScreenState extends State<TimerScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Resumen de penalización
+                      // Información de registros
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1092,14 +1266,27 @@ class _TimerScreenState extends State<TimerScreen> {
                           color: Colors.amber.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text(
-                          'Se crearán $jugadoresFaltantes registros de $minutosPenalizacion min c/u',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Registros actuales: ${timerProvider.participantesRegistrados}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              'Total: ${timerProvider.participantesRegistrados + jugadoresFaltantes}/15',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -1130,18 +1317,55 @@ class _TimerScreenState extends State<TimerScreen> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
+                          // Validar que no exceda 15 registros
+                          final totalRegistros =
+                              timerProvider.participantesRegistrados +
+                              jugadoresFaltantes;
+                          if (totalRegistros > 15) {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                title: const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text('Inconsistencia'),
+                                  ],
+                                ),
+                                content: Text(
+                                  'No se puede aplicar la penalización.\n\nRegistros actuales: ${timerProvider.participantesRegistrados}\nJugadores faltantes: $jugadoresFaltantes\nTotal: $totalRegistros\n\nEl máximo permitido es 15 registros.',
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Entendido'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            return;
+                          }
+
                           Navigator.of(dialogContext).pop();
                           await timerProvider.aplicarPenalizacion(
                             jugadoresFaltantes,
-                            minutosPenalizacion,
+                            0, // 0 minutos = 00:00:00.00
                           );
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  '$jugadoresFaltantes registros de $minutosPenalizacion min agregados',
+                                  '$jugadoresFaltantes registros de jugadores penalizados',
                                 ),
-                                backgroundColor: Colors.orange.shade700,
+                                backgroundColor: Colors.black,
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
@@ -1181,67 +1405,55 @@ class _TimerScreenState extends State<TimerScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+      builder: (context) => SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(
-                Icons.storage_rounded,
-                color: AppTheme.primaryColor,
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF57C00).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFF57C00),
+                    size: 28,
+                  ),
+                ),
+                title: const Text(
+                  'Aplicar Penalización',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                subtitle: const Text(
+                  'Registrar jugadores ausentes (tiempo 00:00:00)',
+                  style: TextStyle(fontSize: 13),
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right,
+                  color: Color(0xFFF57C00),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _mostrarDialogPenalizacion(context);
+                },
               ),
-              title: const Text('Ver Base de Datos Local'),
-              subtitle: const Text('Registros almacenados en SQLite'),
-              onTap: () {
-                Navigator.pop(context);
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => const DatabaseViewerModal(),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(
-                Icons.warning_amber_rounded,
-                color: Color(0xFFF57C00),
-              ),
-              title: const Text('Aplicar Penalización'),
-              subtitle: const Text('Por jugadores faltantes'),
-              onTap: () {
-                Navigator.pop(context);
-                _mostrarDialogPenalizacion(context);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppTheme.errorColor),
-              title: const Text('Cerrar Sesión'),
-              onTap: () {
-                Navigator.pop(context);
-                
-                // Limpiar estado del timer antes de cerrar sesión
-                final timerProvider = Provider.of<TimerProvider>(context, listen: false);
-                timerProvider.clearAll();
-                
-                // Cerrar sesión
-                Provider.of<AuthProvider>(context, listen: false).logout();
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-            ),
-          ],
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );
@@ -1381,173 +1593,253 @@ class _TimerScreenState extends State<TimerScreen> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.more_vert,
-                            color: Colors.white,
-                            size: 26,
+                        // Botón de penalización (icono de usuario faltante)
+                        Tooltip(
+                          message: 'Registrar jugadores ausentes',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _mostrarDialogPenalizacion(context),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.4),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.person_off_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
                           ),
-                          onPressed: () => _mostrarMenuOpciones(context),
                         ),
                       ],
                     ),
                   ),
 
-                  // Cronómetro e indicador de estado
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Indicador de estado de la competencia
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                  // Cronómetro e indicador de estado (ocultar si datos ya fueron enviados)
+                  if (!timerProvider.datosEnviados)
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _getEstadoColors(timerProvider),
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _getEstadoColors(
-                                  timerProvider,
-                                )[0].withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _getEstadoIcon(timerProvider),
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                timerProvider.estadoCompetencia,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Cronómetro
-                        Text(
-                          timerProvider.tiempoFormateado,
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.bold,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                            height: 1.1,
-                            foreground: Paint()
-                              ..shader =
-                                  LinearGradient(
-                                    colors: timerProvider.isCompleted
-                                        ? [
-                                            AppTheme.secondaryColor,
-                                            AppTheme.secondaryColor.withOpacity(
-                                              0.8,
-                                            ),
-                                          ]
-                                        : timerProvider.isRunning
-                                        ? [
-                                            const Color(0xFF667eea),
-                                            const Color(0xFF764ba2),
-                                          ]
-                                        : [
-                                            Colors.grey.shade600,
-                                            Colors.grey.shade500,
-                                          ],
-                                  ).createShader(
-                                    const Rect.fromLTWH(0, 0, 200, 70),
-                                  ),
-                          ),
-                        ),
-                        // Botón de envío cuando se completa
-                        if (timerProvider.isCompleted)
-                          const SizedBox(height: 20),
-                        if (timerProvider.isCompleted)
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Indicador de estado de la competencia
                           Container(
-                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
-                              gradient: timerProvider.datosEnviados
-                                  ? const LinearGradient(
-                                      colors: [Colors.grey, Colors.grey],
-                                    )
-                                  : const LinearGradient(
-                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                                    ),
-                              borderRadius: BorderRadius.circular(15),
+                              gradient: LinearGradient(
+                                colors: _getEstadoColors(timerProvider),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
                               boxShadow: [
-                                if (!timerProvider.datosEnviados)
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF667eea,
-                                    ).withOpacity(0.4),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 5),
-                                  ),
+                                BoxShadow(
+                                  color: _getEstadoColors(
+                                    timerProvider,
+                                  )[0].withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
                               ],
                             ),
-                            child: ElevatedButton.icon(
-                              onPressed: timerProvider.datosEnviados
-                                  ? null
-                                  : () => _mostrarConfirmacionEnvio(context),
-                              icon: Icon(
-                                timerProvider.datosEnviados
-                                    ? Icons.check_circle
-                                    : Icons.cloud_upload,
-                                size: 20,
-                              ),
-                              label: Text(
-                                timerProvider.datosEnviados
-                                    ? 'Datos Ya Enviados'
-                                    : 'Enviar Data Recolectada',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getEstadoIcon(timerProvider),
+                                  color: Colors.white,
+                                  size: 16,
                                 ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                foregroundColor: Colors.white,
-                                disabledForegroundColor: Colors.white70,
+                                const SizedBox(width: 8),
+                                Text(
+                                  timerProvider.estadoCompetencia,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Cronómetro
+                          Text(
+                            timerProvider.tiempoFormateado,
+                            style: TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              height: 1.1,
+                              foreground: Paint()
+                                ..shader =
+                                    LinearGradient(
+                                      colors: timerProvider.isCompleted
+                                          ? [
+                                              AppTheme.secondaryColor,
+                                              AppTheme.secondaryColor
+                                                  .withOpacity(0.8),
+                                            ]
+                                          : timerProvider.isRunning
+                                          ? [
+                                              const Color(0xFF667eea),
+                                              const Color(0xFF764ba2),
+                                            ]
+                                          : [
+                                              Colors.grey.shade600,
+                                              Colors.grey.shade500,
+                                            ],
+                                    ).createShader(
+                                      const Rect.fromLTWH(0, 0, 200, 70),
+                                    ),
+                            ),
+                          ),
+                          // Mensaje cuando la competencia no ha iniciado
+                          if (!timerProvider.isRunning && !timerProvider.isCompleted)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
+                                  horizontal: 16,
+                                  vertical: 12,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.amber.shade300,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.hourglass_empty_rounded,
+                                      color: Colors.amber.shade700,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Flexible(
+                                      child: Text(
+                                        'Esperando inicio de competencia...\nEl cronómetro iniciará automáticamente',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.amber.shade800,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+
+                  // Botón de envío cuando hay EXACTAMENTE 15 registros o está completado
+                  if (timerProvider.participantesRegistrados >= 15 ||
+                      timerProvider.isCompleted)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: timerProvider.datosEnviados
+                              ? const LinearGradient(
+                                  colors: [Colors.grey, Colors.grey],
+                                )
+                              : (timerProvider.participantesRegistrados != 15)
+                              ? const LinearGradient(
+                                  colors: [Colors.orange, Colors.deepOrange],
+                                )
+                              : const LinearGradient(
+                                  colors: [
+                                    Color(0xFF667eea),
+                                    Color(0xFF764ba2),
+                                  ],
+                                ),
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            if (!timerProvider.datosEnviados)
+                              BoxShadow(
+                                color:
+                                    (timerProvider.participantesRegistrados !=
+                                                15
+                                            ? Colors.orange
+                                            : const Color(0xFF667eea))
+                                        .withOpacity(0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 5),
+                              ),
+                          ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: timerProvider.datosEnviados
+                              ? null
+                              : (timerProvider.participantesRegistrados == 15)
+                              ? () => _mostrarConfirmacionEnvio(context)
+                              : null,
+                          icon: Icon(
+                            timerProvider.datosEnviados
+                                ? Icons.check_circle
+                                : (timerProvider.participantesRegistrados != 15)
+                                ? Icons.warning
+                                : Icons.cloud_upload,
+                            size: 20,
+                          ),
+                          label: Text(
+                            timerProvider.datosEnviados
+                                ? 'Datos Ya Enviados'
+                                : (timerProvider.participantesRegistrados != 15)
+                                ? 'Completa 15 Registros (${timerProvider.participantesRegistrados}/15)'
+                                : 'Enviar Registros de Tiempos',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            disabledForegroundColor: Colors.white70,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   const SizedBox(height: 12),
 
@@ -1675,77 +1967,89 @@ class _TimerScreenState extends State<TimerScreen> {
                               ],
                             ),
                           ),
-                          // Lista
+                          // Lista con Pull-to-Refresh
                           Expanded(
-                            child: timerProvider.registros.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                            child: RefreshIndicator(
+                              onRefresh: () => timerProvider.refrescarDatos(),
+                              color: const Color(0xFF667eea),
+                              backgroundColor: Colors.white,
+                              strokeWidth: 2.5,
+                              child: timerProvider.registros.isEmpty
+                                  ? ListView(
+                                      // ListView vacío para que funcione el pull-to-refresh
+                                      physics: const AlwaysScrollableScrollPhysics(),
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(20),
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                const Color(
-                                                  0xFF667eea,
-                                                ).withOpacity(0.1),
-                                                const Color(
-                                                  0xFF764ba2,
-                                                ).withOpacity(0.1),
-                                              ],
-                                            ),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            FontAwesomeIcons.clockRotateLeft,
-                                            size: 50,
-                                            color: Colors.grey.shade300,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'No hay registros',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          'Presiona "MARCAR TIEMPO" al\ncruce de cada participante',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade400,
+                                        SizedBox(
+                                          height: MediaQuery.of(context).size.height * 0.25,
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(20),
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: [
+                                                      const Color(0xFF667eea).withOpacity(0.1),
+                                                      const Color(0xFF764ba2).withOpacity(0.1),
+                                                    ],
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  FontAwesomeIcons.clockRotateLeft,
+                                                  size: 50,
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'No hay registros',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                'Presiona "MARCAR TIEMPO" al\ncruce de cada participante',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey.shade400,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                '↓ Desliza para actualizar',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey.shade400,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
+                                    )
+                                  : ListView.builder(
+                                      physics: const AlwaysScrollableScrollPhysics(),
+                                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                      itemCount: timerProvider.registros.length,
+                                      itemBuilder: (context, index) {
+                                        final registro = timerProvider.registros[index];
+                                        return TimeMarkCard(
+                                          registro: registro,
+                                          posicion: index + 1,
+                                          mostrarBotonEliminar: !timerProvider.datosEnviados,
+                                          onDelete: () => timerProvider.eliminarRegistro(
+                                            registro.idRegistro,
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      0,
-                                      16,
-                                      16,
-                                    ),
-                                    itemCount: timerProvider.registros.length,
-                                    itemBuilder: (context, index) {
-                                      final registro =
-                                          timerProvider.registros[index];
-                                      return TimeMarkCard(
-                                        registro: registro,
-                                        posicion: index + 1,
-                                        onDelete: () =>
-                                            timerProvider.eliminarRegistro(
-                                              registro.idRegistro,
-                                            ),
-                                      );
-                                    },
-                                  ),
+                            ),
                           ),
                         ],
                       ),

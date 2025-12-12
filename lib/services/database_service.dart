@@ -165,6 +165,27 @@ class DatabaseService {
     return count > 0;
   }
 
+  // Contar registros de un equipo
+  Future<int> contarRegistrosEquipo(int equipoId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM registros_tiempo WHERE equipo_id = ?',
+      [equipoId],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // Eliminar todos los registros de un equipo específico
+  Future<int> eliminarRegistrosEquipo(int equipoId) async {
+    final db = await database;
+    final deleted = await db.delete(
+      'registros_tiempo',
+      where: 'equipo_id = ?',
+      whereArgs: [equipoId],
+    );
+    return deleted;
+  }
+
   // Obtener todos los registros con información del equipo
   Future<List<Map<String, dynamic>>> obtenerTodosLosRegistros() async {
     final db = await database;

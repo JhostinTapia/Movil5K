@@ -6,6 +6,9 @@ import 'package:web_socket_channel/status.dart' as status;
 import '../config/api_config.dart';
 
 /// Tipos de mensajes WebSocket
+/// 
+/// NOTA: Los registros ahora se envían por HTTP POST.
+/// El WebSocket solo recibe notificaciones del servidor.
 enum WebSocketMessageType {
   carreraIniciada,
   carreraDetenida,
@@ -14,6 +17,7 @@ enum WebSocketMessageType {
   conexionEstablecida,
   tiempoRegistrado,
   tiemposRegistradosBatch,
+  registrosActualizados, 
   equipoAsignado,
   sincronizacionCompletada,
   pong,
@@ -63,6 +67,8 @@ class WebSocketMessage {
         return WebSocketMessageType.tiempoRegistrado;
       case 'tiempos_registrados_batch':
         return WebSocketMessageType.tiemposRegistradosBatch;
+      case 'registros_actualizados':
+        return WebSocketMessageType.registrosActualizados;
       case 'equipo.asignado':
         return WebSocketMessageType.equipoAsignado;
       case 'sincronizacion.completada':

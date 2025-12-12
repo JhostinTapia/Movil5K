@@ -123,10 +123,10 @@ class RegistroTiempo {
   }
 
   String get tiempoFormateado {
+    final h = horas.toString().padLeft(2, '0');
     final m = minutos.toString().padLeft(2, '0');
     final s = segundos.toString().padLeft(2, '0');
-    final cs = (milisegundos ~/ 10).toString().padLeft(2, '0');
-    return '$m:$s.$cs';
+    return '$h:$m:$s';
   }
 
   RegistroTiempo copyWith({
