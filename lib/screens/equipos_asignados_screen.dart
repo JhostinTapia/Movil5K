@@ -786,33 +786,13 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
       builder: (context, snapshot) {
         final estadoCompetencia = snapshot.data;
         final enCurso = estadoCompetencia?['enCurso'] ?? false;
-        final activa = estadoCompetencia?['activa'] ?? false;
-
-        // Determinar color y texto del badge de estado para la card de competencia
-        Color estadoBgColor;
-        Color estadoTextColor;
-        String estadoTexto;
-
-        if (enCurso) {
-          estadoBgColor = Colors.green.shade100;
-          estadoTextColor = Colors.green.shade700;
-          estadoTexto = 'En Curso';
-        } else if (activa) {
-          estadoBgColor = Colors.orange.shade100;
-          estadoTextColor = Colors.orange.shade700;
-          estadoTexto = 'Programada';
-        } else {
-          estadoBgColor = Colors.grey.shade200;
-          estadoTextColor = Colors.grey.shade700;
-          estadoTexto = 'Inactiva';
-        }
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tarjeta de competencia
+              // Tarjeta de competencia (sin badge de estado)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -856,26 +836,6 @@ class _EquiposAsignadosScreenState extends State<EquiposAsignadosScreen>
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: estadoBgColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        estadoTexto,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: estadoTextColor,
-                          letterSpacing: 0.3,
-                        ),
                       ),
                     ),
                   ],

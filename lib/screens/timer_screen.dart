@@ -1044,8 +1044,8 @@ class _TimerScreenState extends State<TimerScreen> {
           // Actualizar estado local
           timerProvider.marcarComoEnviado();
         } else {
-          // Error real
-          _mostrarModalError(navigator.context, mensaje);
+          // Error real - convertir a mensaje amigable
+          _mostrarModalError(navigator.context, _convertirErrorAmigable(mensaje));
         }
       }
     } catch (e) {
@@ -1054,6 +1054,9 @@ class _TimerScreenState extends State<TimerScreen> {
       navigator.pop();
 
       await Future.delayed(const Duration(milliseconds: 100));
+
+      // Convertir error técnico a mensaje amigable
+      final mensajeAmigable = _convertirErrorAmigable(e.toString());
 
       showDialog(
         context: navigator.context,
@@ -1088,7 +1091,7 @@ class _TimerScreenState extends State<TimerScreen> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'Error',
+                  'Error al Enviar',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -1097,7 +1100,7 @@ class _TimerScreenState extends State<TimerScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Ocurrió un error al enviar los datos: $e',
+                  mensajeAmigable,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -1134,6 +1137,59 @@ class _TimerScreenState extends State<TimerScreen> {
         ),
       );
     }
+  }
+
+  /// Convierte mensajes de error técnicos a mensajes amigables para el usuario
+  String _convertirErrorAmigable(String error) {
+    final errorLower = error.toLowerCase();
+    
+    // Competencia no está en curso
+    if (errorLower.contains('competencia') && errorLower.contains('no') && 
+        (errorLower.contains('curso') || errorLower.contains('running'))) {
+      return 'La competencia ha finalizado.\n\nNo es posible enviar los registros en este momento.';
+    }
+    
+    // Error de conexión/red
+    if (errorLower.contains('timeout') || errorLower.contains('connection') ||
+        errorLower.contains('socket') || errorLower.contains('network')) {
+      return 'No se pudo conectar con el servidor.\n\nVerifica tu conexión a internet e intenta nuevamente.';
+    }
+    
+    // Error de autenticación
+    if (errorLower.contains('401') || errorLower.contains('unauthorized') ||
+        errorLower.contains('token')) {
+      return 'Tu sesión ha expirado.\n\nPor favor, cierra sesión e ingresa nuevamente.';
+    }
+    
+    // Error 404
+    if (errorLower.contains('404') || errorLower.contains('not found')) {
+      return 'El servidor no pudo procesar la solicitud.\n\nIntenta nuevamente más tarde.';
+    }
+    
+    // Error 500 del servidor
+    if (errorLower.contains('500') || errorLower.contains('internal server')) {
+      return 'El servidor está experimentando problemas.\n\nIntenta nuevamente en unos minutos.';
+    }
+    
+    // Registros ya enviados
+    if (errorLower.contains('ya') && errorLower.contains('registr')) {
+      return 'Los registros ya fueron enviados anteriormente.';
+    }
+    
+    // Error genérico - limpiar mensaje técnico
+    // Remover patrones como "ApiException:", "Status: 400", etc.
+    String mensajeLimpio = error
+        .replaceAll(RegExp(r'ApiException:\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\(Status:\s*\d+\)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'Status:\s*\d+', caseSensitive: false), '')
+        .replaceAll(RegExp(r'Exception:\s*', caseSensitive: false), '')
+        .trim();
+    
+    if (mensajeLimpio.isEmpty || mensajeLimpio.length > 100) {
+      return 'Ocurrió un error inesperado.\n\nPor favor, intenta nuevamente.';
+    }
+    
+    return mensajeLimpio;
   }
 
   void _mostrarDialogPenalizacion(BuildContext context) {
@@ -1797,6 +1853,10 @@ class _TimerScreenState extends State<TimerScreen> {
                               ? const LinearGradient(
                                   colors: [Colors.grey, Colors.grey],
                                 )
+                              : (!timerProvider.competenciaEnCurso)
+                              ? const LinearGradient(
+                                  colors: [Colors.grey, Colors.grey],
+                                )
                               : (timerProvider.participantesRegistrados != 15)
                               ? const LinearGradient(
                                   colors: [Colors.orange, Colors.deepOrange],
@@ -1809,7 +1869,7 @@ class _TimerScreenState extends State<TimerScreen> {
                                 ),
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
-                            if (!timerProvider.datosEnviados)
+                            if (!timerProvider.datosEnviados && timerProvider.competenciaEnCurso)
                               BoxShadow(
                                 color:
                                     (timerProvider.participantesRegistrados !=
@@ -1825,12 +1885,16 @@ class _TimerScreenState extends State<TimerScreen> {
                         child: ElevatedButton.icon(
                           onPressed: timerProvider.datosEnviados
                               ? null
+                              : (!timerProvider.competenciaEnCurso)
+                              ? null
                               : (timerProvider.participantesRegistrados == 15)
                               ? () => _mostrarConfirmacionEnvio(context)
                               : null,
                           icon: Icon(
                             timerProvider.datosEnviados
                                 ? Icons.check_circle
+                                : (!timerProvider.competenciaEnCurso)
+                                ? Icons.block
                                 : (timerProvider.participantesRegistrados != 15)
                                 ? Icons.warning
                                 : Icons.cloud_upload,
@@ -1839,6 +1903,8 @@ class _TimerScreenState extends State<TimerScreen> {
                           label: Text(
                             timerProvider.datosEnviados
                                 ? 'Datos Ya Enviados'
+                                : (!timerProvider.competenciaEnCurso)
+                                ? 'Competencia Finalizada'
                                 : (timerProvider.participantesRegistrados != 15)
                                 ? 'Completa 15 Registros (${timerProvider.participantesRegistrados}/15)'
                                 : 'Enviar Registros de Tiempos',
@@ -1988,111 +2054,82 @@ class _TimerScreenState extends State<TimerScreen> {
                               ],
                             ),
                           ),
-                          // Lista con Pull-to-Refresh
+                          // Lista de registros (sin pull-to-refresh)
                           Expanded(
-                            child: RefreshIndicator(
-                              onRefresh: () => timerProvider.refrescarDatos(),
-                              color: const Color(0xFF004C7B),
-                              backgroundColor: Colors.white,
-                              strokeWidth: 2.5,
-                              child: timerProvider.registros.isEmpty
-                                  ? ListView(
-                                      // ListView vacío para que funcione el pull-to-refresh
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
+                            child: timerProvider.registros.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        SizedBox(
-                                          height:
-                                              MediaQuery.of(
-                                                context,
-                                              ).size.height *
-                                              0.25,
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(
-                                                  20,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      const Color(
-                                                        0xFF004C7B,
-                                                      ).withOpacity(0.1),
-                                                      const Color(
-                                                        0xFF0066A1,
-                                                      ).withOpacity(0.1),
-                                                    ],
-                                                  ),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Icon(
-                                                  FontAwesomeIcons
-                                                      .clockRotateLeft,
-                                                  size: 50,
-                                                  color: Colors.grey.shade300,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                'No hay registros',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.grey.shade500,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                'Presiona "MARCAR TIEMPO" al\ncruce de cada participante',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.grey.shade400,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                '↓ Desliza para actualizar',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey.shade400,
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                              ),
-                                            ],
+                                        Container(
+                                          padding: const EdgeInsets.all(
+                                            20,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                const Color(
+                                                  0xFF004C7B,
+                                                ).withOpacity(0.1),
+                                                const Color(
+                                                  0xFF0066A1,
+                                                ).withOpacity(0.1),
+                                              ],
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            FontAwesomeIcons
+                                                .clockRotateLeft,
+                                            size: 50,
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'No hay registros',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Presiona "MARCAR TIEMPO" al\ncruce de cada participante',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey.shade400,
                                           ),
                                         ),
                                       ],
-                                    )
-                                  : ListView.builder(
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      padding: const EdgeInsets.fromLTRB(
-                                        16,
-                                        0,
-                                        16,
-                                        16,
-                                      ),
-                                      itemCount: timerProvider.registros.length,
-                                      itemBuilder: (context, index) {
-                                        final registro =
-                                            timerProvider.registros[index];
-                                        return TimeMarkCard(
-                                          registro: registro,
-                                          posicion: index + 1,
-                                          mostrarBotonEliminar:
-                                              !timerProvider.datosEnviados,
-                                          onDelete: () =>
-                                              timerProvider.eliminarRegistro(
-                                                registro.idRegistro,
-                                              ),
-                                        );
-                                      },
                                     ),
-                            ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
+                                    itemCount: timerProvider.registros.length,
+                                    itemBuilder: (context, index) {
+                                      final registro =
+                                          timerProvider.registros[index];
+                                      return TimeMarkCard(
+                                        registro: registro,
+                                        posicion: index + 1,
+                                        mostrarBotonEliminar:
+                                            !timerProvider.datosEnviados,
+                                        onDelete: () =>
+                                            timerProvider.eliminarRegistro(
+                                              registro.idRegistro,
+                                            ),
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
