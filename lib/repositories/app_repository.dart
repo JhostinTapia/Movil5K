@@ -164,9 +164,7 @@ class AppRepository {
   /// Obtiene todos los equipos (filtrados automáticamente por el juez autenticado en el servidor)
   Future<List<Equipo>> getEquipos({int? competenciaId}) async {
     try {
-      final data = await _apiService.getEquipos(
-        competenciaId: competenciaId,
-      );
+      final data = await _apiService.getEquipos(competenciaId: competenciaId);
       return data.map((json) => Equipo.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Error obteniendo equipos: $e');
@@ -187,16 +185,38 @@ class AppRepository {
 
   // ==================== REGISTROS DE TIEMPO ====================
 
+  static const int maxRegistrosPorEquipo = 15;
+
   /// Guarda un registro de tiempo localmente
-  Future<void> saveRegistroTiempo(
+  /// VALIDACIÓN: No permite guardar más de 15 registros por equipo
+  Future<bool> saveRegistroTiempo(
     RegistroTiempo registro,
     Equipo equipo,
   ) async {
     try {
+      // VALIDACIÓN CRÍTICA: Verificar límite ANTES de guardar
+      final registrosActuales = await _databaseService.contarRegistrosEquipo(
+        equipo.id,
+      );
+
+      if (registrosActuales >= maxRegistrosPorEquipo) {
+        debugPrint(
+          '❌ LÍMITE ALCANZADO: Ya hay $registrosActuales registros para equipo ${equipo.id}',
+        );
+        debugPrint(
+          '   No se puede guardar más. Máximo permitido: $maxRegistrosPorEquipo',
+        );
+        return false; // No guardar, ya está lleno
+      }
+
       await _databaseService.insertRegistroTiempo(registro);
+      debugPrint(
+        '✅ Registro guardado: ${registrosActuales + 1}/$maxRegistrosPorEquipo',
+      );
+      return true;
     } catch (e) {
       debugPrint('Error guardando registro: $e');
-      rethrow;
+      return false;
     }
   }
 
@@ -241,9 +261,19 @@ class AppRepository {
     }
   }
 
+  /// Cuenta la cantidad de registros que tiene un equipo
+  Future<int> contarRegistrosEquipo(int equipoId) async {
+    try {
+      return await _databaseService.contarRegistrosEquipo(equipoId);
+    } catch (e) {
+      debugPrint('Error contando registros del equipo: $e');
+      return 0;
+    }
+  }
+
   // ==================== SINCRONIZACIÓN ====================
 
-  /// Sincroniza los registros pendientes con el servidor
+  /// Sincroniza los registros pendientes con el servidor usando HTTP
   Future<Map<String, dynamic>> syncRegistros({required int equipoId}) async {
     try {
       final accessToken = await _storageService.getAccessToken();
@@ -268,6 +298,38 @@ class AppRepository {
       rethrow;
     }
   }
+
+  /// Enviar registros por HTTP directamente
+  ///
+  /// Este método envía los registros al servidor usando HTTP POST
+  /// que es más confiable que WebSocket para envío de datos.
+  Future<Map<String, dynamic>> enviarRegistrosPorHttp({
+    required int equipoId,
+    required List<RegistroTiempo> registros,
+  }) async {
+    try {
+      final result = await _syncService.enviarRegistrosPorHttp(
+        equipoId: equipoId,
+        registros: registros,
+      );
+
+      return {
+        'success': result.todoExitoso,
+        'total': result.totalEnviados,
+        'exitosos': result.exitosos,
+        'fallidos': result.fallidos,
+        'errores': result.errores,
+      };
+    } catch (e) {
+      debugPrint('Error enviando registros por HTTP: $e');
+      rethrow;
+    }
+  }
+
+  // ==================== NOTA: La app móvil es la FUENTE DE VERDAD ====================
+  // Los registros se guardan localmente y se envían al servidor.
+  // NUNCA se descargan registros del servidor a la app.
+  // Esto evita problemas de sincronización y pérdida de datos.
 
   /// Obtiene el estado de sincronización de un equipo
   Future<Map<String, dynamic>> getSyncStatus({required int equipoId}) async {

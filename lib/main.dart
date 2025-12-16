@@ -9,6 +9,7 @@ import 'providers/timer_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/timer_screen.dart';
 import 'screens/equipos_asignados_screen.dart';
+import 'screens/resultados_equipo_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,7 +48,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Carrera 5K UNL',
+        title: 'RASC UNL',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         initialRoute: '/',
@@ -56,6 +57,7 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/equipos': (context) => const EquiposAsignadosScreen(),
           '/timer': (context) => const TimerScreen(),
+          '/resultados': (context) => const ResultadosEquipoScreen(),
         },
       ),
     );
@@ -95,13 +97,14 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppTheme.primaryColor,
-              AppTheme.primaryColor.withOpacity(0.8),
+              Color(0xFF0077B6), // Azul claro
+              Color(0xFF004C7B), // Azul medio
+              Color(0xFF003557), // Azul oscuro
             ],
           ),
         ),
@@ -110,32 +113,37 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 150,
-                height: 150,
+                width: 180,
+                height: 180,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withOpacity(0.3),
                       blurRadius: 30,
                       offset: const Offset(0, 15),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.timer,
-                  size: 80,
-                  color: AppTheme.primaryColor,
+                child: ClipOval(
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Image.asset(
+                      'assets/img/logoAPK.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 40),
               const Text(
-                'Carrera 5K',
+                'RASC UNL',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                  letterSpacing: 2,
                 ),
               ),
               const SizedBox(height: 8),

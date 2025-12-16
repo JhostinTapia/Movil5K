@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Colores principales
-  static const Color primaryColor = Color(0xFF1E88E5); // Azul deportivo
-  static const Color secondaryColor = Color(0xFF43A047); // Verde éxito
-  static const Color accentColor = Color(0xFFFFA726); // Naranja acento
-  static const Color errorColor = Color(0xFFE53935); // Rojo error
+  // Color principal - Azul UNL
+  static const Color primaryColor = Color(0xFF004C7B); // Azul UNL
+  static const Color secondaryColor = Color(0xFF0066A1); // Azul claro UNL
+  static const Color accentColor = Color(0xFF003557); // Azul oscuro UNL
+  static const Color errorColor = Color(0xFFD32F2F); // Rojo error
   static const Color backgroundColor = Color(0xFFF5F5F5);
   static const Color cardColor = Colors.white;
-  static const Color textPrimary = Color(0xFF212121);
+  static const Color textPrimary = Color(0xFF211915); // Negro/Gris oscuro
   static const Color textSecondary = Color(0xFF757575);
+
+  // Colores de gradiente azul UNL
+  static const Color blueLight = Color(0xFF0077B6); // Azul claro
+  static const Color blueMedium = Color(0xFF004C7B); // Azul medio (principal)
+  static const Color blueDark = Color(0xFF003557); // Azul oscuro
 
   static ThemeData get lightTheme {
     return ThemeData(
