@@ -104,9 +104,19 @@ class TimerProvider extends ChangeNotifier {
     return 'INACTIVA';
   }
 
+  // Verifica si la competencia actual está en curso
+  bool get competenciaEnCurso {
+    return _competenciaActual?.enCurso ?? false;
+  }
+
   // Verifica si puede marcar tiempo (competencia debe estar en curso y datos NO enviados)
   bool get puedeMarcarTiempo {
     return _stopwatch.isRunning && canAddMore && !_datosEnviados;
+  }
+
+  // Verifica si puede enviar datos (competencia debe estar en curso)
+  bool get puedeEnviarDatos {
+    return competenciaEnCurso && !_datosEnviados && _registros.length == 15;
   }
 
   // Obtiene el tiempo restante hasta el inicio de la competencia
