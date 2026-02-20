@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Configuración de seguridad de red para Android -->
+<!-- Este archivo permite conexiones HTTP en desarrollo y HTTPS en producción -->
+<network-security-config>
+    <!-- Configuración por defecto: permite HTTPS -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- Excepciones para desarrollo local (HTTP) -->
+    <!-- En producción con HTTPS, puedes eliminar estas excepciones -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Localhost para desarrollo -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        
+        <!-- Emulador Android -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        
+        <!-- Redes locales comunes -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        
+        <!-- Agrega aquí tu IP de desarrollo si es diferente -->
+        <domain includeSubdomains="true">192.168.0.190</domain>
+        <domain includeSubdomains="true">192.168.0.108</domain>
+    </domain-config>
+</network-security-config>

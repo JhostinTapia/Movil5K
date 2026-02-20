@@ -135,15 +135,33 @@ class AppRepository {
   Future<List<Competencia>> getCompetencias({
     bool? activa,
     bool? enCurso,
+    bool forceRefresh = false,
   }) async {
     try {
+      if (!forceRefresh) {
+        final cached = await _storageService.getCompetenciasCache();
+        if (cached != null && cached.isNotEmpty) {
+          return cached.map((json) => Competencia.fromJson(json)).toList();
+        }
+      }
+
       final data = await _apiService.getCompetencias(
         activa: activa,
         enCurso: enCurso,
       );
-      return data.map((json) => Competencia.fromJson(json)).toList();
+      final list = data.map((json) => Competencia.fromJson(json)).toList();
+      // Guardar caché liviana para reabrir rápido/offline
+      await _storageService.saveCompetenciasCache(
+        list.map((c) => c.toJson()).toList(),
+      );
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo competencias: $e');
+      // Fallback a caché si existe
+      final cached = await _storageService.getCompetenciasCache();
+      if (cached != null && cached.isNotEmpty) {
+        return cached.map((json) => Competencia.fromJson(json)).toList();
+      }
       rethrow;
     }
   }
@@ -162,12 +180,34 @@ class AppRepository {
   // ==================== EQUIPOS ====================
 
   /// Obtiene todos los equipos (filtrados automáticamente por el juez autenticado en el servidor)
-  Future<List<Equipo>> getEquipos({int? competenciaId}) async {
+  Future<List<Equipo>> getEquipos({int? competenciaId, bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && competenciaId != null) {
+        final cached = await _storageService.getEquiposCache(competenciaId);
+        if (cached != null && cached.isNotEmpty) {
+          return cached.map((json) => Equipo.fromJson(json)).toList();
+        }
+      }
+
       final data = await _apiService.getEquipos(competenciaId: competenciaId);
-      return data.map((json) => Equipo.fromJson(json)).toList();
+      final list = data.map((json) => Equipo.fromJson(json)).toList();
+
+      if (competenciaId != null) {
+        await _storageService.saveEquiposCache(
+          competenciaId,
+          list.map((e) => e.toJson()).toList(),
+        );
+      }
+
+      return list;
     } catch (e) {
       debugPrint('Error obteniendo equipos: $e');
+      if (competenciaId != null) {
+        final cached = await _storageService.getEquiposCache(competenciaId);
+        if (cached != null && cached.isNotEmpty) {
+          return cached.map((json) => Equipo.fromJson(json)).toList();
+        }
+      }
       rethrow;
     }
   }
@@ -356,8 +396,17 @@ class AppRepository {
   // ==================== WEBSOCKET ====================
 
   /// Conecta al WebSocket para recibir notificaciones
+  /// Si ya hay una conexión activa, la cierra primero para evitar duplicados
   Future<void> connectWebSocket(int juezId) async {
     try {
+      // ========== CERRAR CONEXIÓN ANTERIOR SI EXISTE ==========
+      // Esto evita tener múltiples conexiones abiertas al mismo grupo
+      if (_webSocketService != null) {
+        debugPrint('🔄 Cerrando conexión WebSocket anterior antes de reconectar...');
+        await _webSocketService!.disconnect();
+        _webSocketService = null;
+      }
+      
       final accessToken = await _storageService.getAccessToken();
       if (accessToken == null) {
         throw Exception('No hay token de acceso');
